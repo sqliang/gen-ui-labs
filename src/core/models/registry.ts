@@ -53,9 +53,19 @@ export const BUILTIN_MODELS: ModelInfo[] = [
   { id: "qwen-max", provider: "qwen", label: "Qwen · Max", contextWindow: 128_000 },
   { id: "qwen-plus", provider: "qwen", label: "Qwen · Plus", contextWindow: 128_000 },
 
-  // Ollama（本地）
-  { id: "ollama:llama3.1", provider: "ollama", label: "Ollama · Llama 3.1 (local)" },
-  { id: "ollama:qwen2.5", provider: "ollama", label: "Ollama · Qwen 2.5 (local)" },
+  // Ollama（本地；contextWindow 取决于部署，按官方最常见的 8K 估）
+  {
+    id: "ollama:llama3.1",
+    provider: "ollama",
+    label: "Ollama · Llama 3.1 (local)",
+    contextWindow: 8_192,
+  },
+  {
+    id: "ollama:qwen2.5",
+    provider: "ollama",
+    label: "Ollama · Qwen 2.5 (local)",
+    contextWindow: 32_768,
+  },
 ];
 
 /** 按 model id 查找 */

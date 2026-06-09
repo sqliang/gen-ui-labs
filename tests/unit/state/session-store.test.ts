@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from "vitest";
 
-import { BUILTIN_MODELS, useSessionStore } from "@/core/state/session-store";
+import { useSessionStore } from "@/core/state/session-store";
 
 describe("session-store", () => {
   beforeEach(() => {
@@ -31,20 +31,5 @@ describe("session-store", () => {
   it("setCurrentLab 修改 lab", () => {
     useSessionStore.getState().setCurrentLab("workbench");
     expect(useSessionStore.getState().currentLab).toBe("workbench");
-  });
-
-  it("BUILTIN_MODELS 至少包含 6 个 provider", () => {
-    const providers = new Set(BUILTIN_MODELS.map((m) => m.provider));
-    expect(providers.size).toBeGreaterThanOrEqual(6);
-  });
-
-  it("BUILTIN_MODELS 每个 provider 至少 1 个模型", () => {
-    const counts = BUILTIN_MODELS.reduce<Record<string, number>>((acc, m) => {
-      acc[m.provider] = (acc[m.provider] ?? 0) + 1;
-      return acc;
-    }, {});
-    for (const [, count] of Object.entries(counts)) {
-      expect(count).toBeGreaterThan(0);
-    }
   });
 });

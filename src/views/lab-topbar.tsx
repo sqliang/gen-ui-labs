@@ -13,7 +13,8 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { BUILTIN_MODELS, useSessionStore } from "@/core/state/session-store";
+import { BUILTIN_MODELS } from "@/core/models/registry";
+import { useSessionStore } from "@/core/state/session-store";
 
 /**
  * Lab 顶部模型选择条。

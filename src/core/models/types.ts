@@ -19,8 +19,8 @@ export interface ModelInfo {
   id: string;
   /** 人类可读 label（"OpenAI · GPT-4o mini"） */
   label: string;
-  /** context window（token 数），可选 */
-  contextWindow?: number;
+  /** context window（token 数） */
+  contextWindow: number;
 }
 
 /** 聊天消息 */
