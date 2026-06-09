@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 import { Badge } from "@/components/ui/badge";
+import { useSessionStore } from "@/core/state/session-store";
 import { cn } from "@/lib/utils";
 
 const LAB_NAV = [
@@ -16,6 +17,7 @@ const LAB_NAV = [
 
 export function LabSidebar() {
   const pathname = usePathname();
+  const currentSessionId = useSessionStore((s) => s.currentSessionId);
 
   return (
     <aside className="bg-card text-card-foreground border-border flex w-56 shrink-0 flex-col border-r">
@@ -58,13 +60,21 @@ export function LabSidebar() {
         <div className="text-muted-foreground text-[10px] font-medium tracking-widest uppercase">
           Session
         </div>
-        <div className="text-muted-foreground text-xs">
-          当前会话
-          <Badge variant="outline" className="ml-2 font-mono text-[10px]">
-            demo
-          </Badge>
+        <div className="flex items-center justify-between gap-2 text-xs">
+          <span className="text-muted-foreground">当前会话</span>
+          {currentSessionId ? (
+            <Badge variant="outline" className="font-mono text-[10px]">
+              {currentSessionId.slice(0, 10)}
+            </Badge>
+          ) : (
+            <Badge variant="secondary" className="text-[10px]">
+              未选中
+            </Badge>
+          )}
         </div>
-        <div className="text-muted-foreground text-xs">W9 接入 IndexedDB 真实 session store</div>
+        <div className="text-muted-foreground text-[11px] leading-relaxed">
+          W9 接入 IndexedDB 真实 session store
+        </div>
       </div>
     </aside>
   );
