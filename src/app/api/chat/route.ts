@@ -13,13 +13,11 @@
 
 import type { StreamChunk } from "@/core/models";
 import { getModelProvider } from "@/core/models";
-import { getScenario, type MockScenario } from "@/core/models/providers/debug-scenarios";
+import { getScenario } from "@/core/models/providers/debug-scenarios";
 import { chatRequestSchema } from "./schema";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs"; // fetch + abort 需要 nodejs runtime（edge 没完整 fetch）
-
-const DEV_SCENARIOS: readonly MockScenario[] = ["default", "long", "tools", "error", "reconnect"];
 
 function sseLine(chunk: StreamChunk): string {
   return `data: ${JSON.stringify(chunk)}\n\n`;

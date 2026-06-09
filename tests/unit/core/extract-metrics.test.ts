@@ -1,7 +1,6 @@
 import { describe, expect, it } from "vitest";
-
+import type { RenderableEvent } from "@/core/protocols/common/types";
 import { extractMetricsFromChunks } from "@/core/render/extract-metrics";
-import type { RenderableEvent } from "@/core/state/streaming-store";
 
 describe("extractMetricsFromChunks", () => {
   it("空数组返回 undefined", () => {

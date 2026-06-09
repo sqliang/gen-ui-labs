@@ -15,7 +15,7 @@ interface SessionState {
   setCurrentLab: (lab: string | null) => void;
 }
 
-const DEFAULT_MODEL = "gpt-4o-mini";
+const DEFAULT_MODEL = "deepseek-chat";
 
 /**
  * 当前会话/模型/Lab 选择。

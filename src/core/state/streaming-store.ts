@@ -1,12 +1,6 @@
 import { create } from "zustand";
 
-/** 协议事件（按 §9 streamingStore 设计） */
-export type RenderableEvent =
-  | { kind: "text"; delta: string; path?: string }
-  | { kind: "component"; op: "mount" | "patch" | "unmount"; id: string }
-  | { kind: "state"; path: string; value: unknown }
-  | { kind: "tool"; name: string; args: unknown }
-  | { kind: "control"; type: "start" | "end" | "error" | "meta"; meta?: unknown };
+import type { ProtocolKind, RenderableEvent } from "@/core/protocols/common/types";
 
 interface StreamingState {
   // === 状态 ===
@@ -15,12 +9,12 @@ interface StreamingState {
   /** 是否正在流式生成 */
   isStreaming: boolean;
   /** 当前协议类型（决定如何 reduce） */
-  protocol: "markdown" | "ag-ui" | "a2ui" | "json-ui";
-  /** 当前累积的文本（Markdown 协议专用，方便 UI 整段渲染） */
+  protocol: ProtocolKind;
+  /** 当前累积的文本（Markdown / AG-UI 协议专用，方便 UI 整段渲染） */
   accumulatedText: string;
 
   // === 动作 ===
-  start: (protocol: StreamingState["protocol"]) => void;
+  start: (protocol: ProtocolKind) => void;
   append: (event: RenderableEvent) => void;
   finish: () => void;
   reset: () => void;
@@ -33,6 +27,9 @@ const MAX_CHUNKS = 10_000;
  *
  * 高频追加、跨组件订阅、不入 URL —— Zustand 承担。
  * 不持久化（刷新即丢，符合"流式"语义）。
+ *
+ * RenderableEvent 类型定义在 core/protocols/common/，
+ * 确保 streaming-store / mock-base / debug-scenarios / /api/chat 共用同一套类型。
  */
 export const useStreamingStore = create<StreamingState>()((set) => ({
   chunks: [],
@@ -50,7 +47,6 @@ export const useStreamingStore = create<StreamingState>()((set) => ({
 
   append: (event) =>
     set((state) => {
-      // 防止内存爆炸：超过 MAX_CHUNKS 后截断前半部分
       const nextChunks =
         state.chunks.length >= MAX_CHUNKS
           ? state.chunks.slice(state.chunks.length - MAX_CHUNKS + 1)

@@ -1,4 +1,4 @@
-import type { RenderableEvent } from "@/core/state/streaming-store";
+import type { RenderableEvent } from "@/core/protocols/common/types";
 
 /**
  * 从一串 RenderableEvent 里提取 observability 指标。

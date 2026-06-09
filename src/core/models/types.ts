@@ -7,7 +7,7 @@
  *   （text / component / state / tool / control）
  */
 
-import type { RenderableEvent } from "@/core/state/streaming-store";
+import type { RenderableEvent } from "@/core/protocols/common/types";
 
 /** 模型 provider id 列表（与 BUILTIN_MODELS 中的 provider 字段对齐） */
 export type ModelProviderId = "openai" | "anthropic" | "google" | "deepseek" | "qwen" | "ollama";

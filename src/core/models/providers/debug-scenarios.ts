@@ -1,4 +1,4 @@
-import type { RenderableEvent } from "@/core/state/streaming-store";
+import type { RenderableEvent } from "@/core/protocols/common/types";
 
 /** 调试场景：mock 引擎支持的 scenario */
 export type MockScenario = "default" | "long" | "tools" | "error" | "reconnect";

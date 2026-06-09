@@ -20,7 +20,7 @@ import { getScenario, type MockScenario, SCENARIOS } from "./debug-scenarios";
 /** 从 ChatRequest.tools 第一个 tool 的 name 推断 scenario */
 function detectScenario(req: ChatRequest): MockScenario {
   const t = req.tools?.[0];
-  if (t?.name && t.name.startsWith("scenario:")) {
+  if (t?.name?.startsWith("scenario:")) {
     return getScenario(t.name.slice("scenario:".length));
   }
   return "default";

@@ -4,11 +4,12 @@ import { useEffect, useRef, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import type { RenderableEvent } from "@/core/protocols/common/types";
 import { extractMetricsFromChunks } from "@/core/render/extract-metrics";
 import { MarkdownRenderer } from "@/core/render/markdown-renderer";
 import { useObservabilityStore } from "@/core/state/observability-store";
 import { useSessionStore } from "@/core/state/session-store";
-import { type RenderableEvent, useStreamingStore } from "@/core/state/streaming-store";
+import { useStreamingStore } from "@/core/state/streaming-store";
 import { fetchSse } from "@/infra/http/sse-client";
 import { cn } from "@/lib/utils";
 
