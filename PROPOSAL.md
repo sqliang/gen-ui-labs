@@ -246,26 +246,33 @@ app/
 
 | 层 | 选型 | 理由 |
 | --- | --- | --- |
-| 框架 | **Next.js 15（App Router）+ React 19** | RSC + Server Actions + Edge Runtime 都能用，路由清晰 |
-| 语言 | **TypeScript 5.x（strict）** | 全栈类型化 |
-| 样式 | **Tailwind CSS v4** + **CSS Variables** | token 化主题，暗色零成本 |
-| 组件库 | **shadcn/ui**（Radix + Tailwind） | Tailwind 原生、可复制可改、无版本锁 |
+所有依赖锁定 **npm `latest` tag** 的当前版本（截至 2026-06）；CI 中用 `npm view <pkg> version` 校对。
+
+| 层 | 选型（@ 版本） | 理由 |
+| --- | --- | --- |
+| 框架 | **Next.js 16.2.7（App Router）+ React 19.2.7** | RSC + Server Actions + Edge Runtime 都能用，路由清晰；Next.js 16 已 GA |
+| 语言 | **TypeScript 6.0.3（strict）** | 全栈类型化 |
+| 样式 | **Tailwind CSS 4.3.0** + **CSS Variables** + `@tailwindcss/postcss` | token 化主题，暗色零成本 |
+| 组件库 | **shadcn/ui**（Radix 1.1.x + Tailwind 4.3 + `class-variance-authority` 0.7.1 + `clsx` 2.1.1 + `tailwind-merge` 3.6.0 + `lucide-react` 1.17.0） | Tailwind 原生、可复制可改、无版本锁 |
 | 头部 | **App Router + RSC + Server Actions** | 协议流用 RSC streaming |
-| 状态 | **Zustand**（客户端）+ **React Server State** | 轻量、无样板 |
-| 数据获取 | **TanStack Query**（如果需要缓存） | 视 Lab 4 仪表盘而定 |
+| 状态 | **Zustand 5.0.14**（客户端）+ **React Server State** | 轻量、无样板 |
+| 数据获取 | **@tanstack/react-query 5.101.0**（如果需要缓存） | 视 Lab 4 仪表盘而定 |
 | 协议流 | **SSE（`ReadableStream`）+ WebSocket** | SSE 默认，WS 备选 |
-| Markdown | **react-markdown + remark-gfm + rehype-raw + rehype-sanitize** | 流式 + 安全 |
-| 代码高亮 | **Shiki**（SSR 友好，主题多） | 暗色主题一致 |
-| 表达式 | **expr-eval** 或 **@expry/expr** | DSL 数据绑定 |
-| 沙箱 | **iframe + `postMessage`** + `@babel/standalone` | 跑生成的 TSX |
-| 工作台布局 | **react-resizable-panels** | 三栏可拖拽 |
-| 流程图 | **@xyflow/react** | 推理 DAG |
-| 图表 | **recharts** | token 折线图 |
-| JSON diff | **jsondiffpatch** | 协议解码器 diff |
-| 表单 | **react-hook-form + zod** | 设置 / Prompt Lab |
-| 测试 | **Vitest + Testing Library + Playwright** | 单元 + e2e |
-| Lint/Format | **Biome**（单仓统一） | 速度优于 ESLint+Prettier 组合 |
+| Markdown | **react-markdown 10.1.0 + remark-gfm 4.0.1 + rehype-raw 7.0.0 + rehype-sanitize 6.0.0** | 流式 + 安全 |
+| 代码高亮 | **Shiki 4.2.0**（SSR 友好，主题多） | 暗色主题一致 |
+| 表达式 | **expr-eval 2.0.2** 或 **@expry/expr** | DSL 数据绑定 |
+| 沙箱 | **iframe + `postMessage`** + `@babel/standalone 7.29.7` | 跑生成的 TSX |
+| 工作台布局 | **react-resizable-panels 4.11.2** | 三栏可拖拽 |
+| 流程图 | **@xyflow/react 12.11.0** | 推理 DAG |
+| 图表 | **recharts 3.8.1** | token 折线图 |
+| JSON diff | **jsondiffpatch 0.7.6** | 协议解码器 diff |
+| 表单 | **react-hook-form 7.78.0 + zod 4.4.3** | 设置 / Prompt Lab；zod v4 API 已稳定 |
+| IndexedDB | **idb-keyval 6.2.5** | session 存储 |
+| 测试 | **Vitest 4.1.8 + @testing-library/react 16.3.2 + @playwright/test 1.60.0** | 单元 + e2e |
+| Lint/Format | **@biomejs/biome 2.4.16**（单仓统一） | 速度优于 ESLint+Prettier 组合 |
 | 监控 | 自研事件总线 + Web Vitals | 不接第三方 |
+
+> **依赖更新策略**：本项目所有依赖**始终取 npm `latest` tag**。新 session 起步时跑一次 `npm view <pkg> version`，把数字落到 README 的依赖表里，再用 `npm install <pkg>@latest`。CI 用 `npm outdated` 巡检。
 
 ### 3.2 项目目录结构
 
@@ -421,3 +428,73 @@ gen-ui-labs/
 | D. 直接开 Lab 3 Workbench | 先把"三栏"做出来，反向推动 Lab 1/2 协议设计 | 1 天 |
 
 你定个方向，我就按选定路径开干。
+
+---
+
+## 8. 依赖版本基线（npm `latest` 校对）
+
+> 校对时间：2026-06-09。所有版本均为 npm `latest` tag 的当前值。
+> 装包时统一用 `npm install <pkg>@latest`，避免锁住旧版本。
+
+| 包 | 版本 |
+| --- | --- |
+| next | **16.2.7** |
+| react | **19.2.7** |
+| react-dom | **19.2.7** |
+| typescript | **6.0.3** |
+| tailwindcss | **4.3.0** |
+| @tailwindcss/postcss | **4.3.0** |
+| @biomejs/biome | **2.4.16** |
+| zustand | **5.0.14** |
+| @tanstack/react-query | **5.101.0** |
+| react-markdown | **10.1.0** |
+| remark-gfm | **4.0.1** |
+| rehype-raw | **7.0.0** |
+| rehype-sanitize | **6.0.0** |
+| shiki | **4.2.0** |
+| expr-eval | **2.0.2** |
+| @babel/standalone | **7.29.7** |
+| react-resizable-panels | **4.11.2** |
+| @xyflow/react | **12.11.0** |
+| recharts | **3.8.1** |
+| jsondiffpatch | **0.7.6** |
+| react-hook-form | **7.78.0** |
+| zod | **4.4.3** |
+| vitest | **4.1.8** |
+| @testing-library/react | **16.3.2** |
+| @playwright/test | **1.60.0** |
+| idb-keyval | **6.2.5** |
+| @axe-core/react | **4.11.3** |
+| @radix-ui/react-dialog | **1.1.16** |
+| @radix-ui/react-tabs | **1.1.14** |
+| @radix-ui/react-slot | **1.2.5** |
+| lucide-react | **1.17.0** |
+| class-variance-authority | **0.7.1** |
+| clsx | **2.1.1** |
+| tailwind-merge | **3.6.0** |
+
+**升级注意（重要）**：
+
+- **Next.js 15 → 16**：breaking 变更集中在 `next/image`、`next.config` 默认行为与异步 `cookies()` / `headers()`。安装前翻一遍 [Next.js 16 upgrade guide](https://nextjs.org/docs/app/building-your-application/upgrading/version-16)。
+- **TypeScript 5 → 6**：类型推断更严格，老代码可能冒出新的类型错误。
+- **Zod 3 → 4**：API 改名（如 `z.string().nonempty()` → `z.string().min(1)`），迁移前看 zod v4 迁移指南。
+- **Vitest 1 → 4**：配置与 API 有调整，沿用旧 snapshot/inline 测试需要适配。
+- **lucide-react 0 → 1**：图标命名空间有调整，可能影响现有 import。
+
+**校对脚本**（CI 里跑）：
+
+```bash
+#!/usr/bin/env bash
+# scripts/check-deps.sh
+set -euo pipefail
+declare -a pkgs=(
+  next react react-dom typescript tailwindcss zustand zod
+  react-markdown shiki @biomejs/biome vitest @xyflow/react
+  recharts react-resizable-panels @tanstack/react-query
+)
+for p in "${pkgs[@]}"; do
+  npm view "$p" version
+done
+```
+
+输出若与本文档第 8 节不一致，要么更新文档、要么锁版本——不要默默装旧版。
