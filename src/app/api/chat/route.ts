@@ -13,10 +13,13 @@
 
 import type { StreamChunk } from "@/core/models";
 import { getModelProvider } from "@/core/models";
+import { getScenario, type MockScenario } from "@/core/models/providers/debug-scenarios";
 import { chatRequestSchema } from "./schema";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs"; // fetch + abort 需要 nodejs runtime（edge 没完整 fetch）
+
+const DEV_SCENARIOS: readonly MockScenario[] = ["default", "long", "tools", "error", "reconnect"];
 
 function sseLine(chunk: StreamChunk): string {
   return `data: ${JSON.stringify(chunk)}\n\n`;
@@ -46,7 +49,42 @@ export async function POST(request: Request): Promise<Response> {
   }
   const body = parsed.data;
 
-  // 2. route to provider
+  // 2. dev-only：注入 scenario 到 tools（mock provider 据此切换行为）
+  const url = new URL(request.url);
+  const scenarioQ = url.searchParams.get("scenario");
+  if (scenarioQ && process.env.NODE_ENV !== "production") {
+    const scenario = getScenario(scenarioQ);
+    if (scenario === "default" && scenarioQ !== "default") {
+      return new Response(
+        JSON.stringify({
+          error: "invalid_scenario",
+          message: `Unknown ?scenario=${scenarioQ}. Valid: long, tools, error, reconnect`,
+        }),
+        { status: 400, headers: { "content-type": "application/json" } },
+      );
+    }
+    if (scenarioQ !== "default") {
+      body.tools = [
+        ...(body.tools ?? []),
+        {
+          name: `scenario:${scenarioQ}`,
+          description: `W4-X debug scenario: ${scenarioQ}`,
+          parameters: {},
+        },
+      ];
+    }
+  } else if (scenarioQ && process.env.NODE_ENV === "production") {
+    // prod 直接拒绝带 ?scenario 的请求
+    return new Response(
+      JSON.stringify({
+        error: "scenario_disabled",
+        message: "?scenario is dev-only; remove it in production",
+      }),
+      { status: 403, headers: { "content-type": "application/json" } },
+    );
+  }
+
+  // 3. route to provider
   const provider = getModelProvider(body.model);
   const encoder = new TextEncoder();
 
