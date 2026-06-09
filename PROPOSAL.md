@@ -493,6 +493,65 @@ const isStreaming = useStreamingStore(s => s.isStreaming)
 
 ---
 
+## 10. W1 落地记录（2026-06-09）
+
+> W1 脚手架已完成 ✅。下列内容已可运行：`npm run dev` / `build` / `typecheck` / `lint` / `test` 全部通过。
+
+### 10.1 已完成的脚手架
+
+| 项 | 状态 | 说明 |
+| --- | --- | --- |
+| Next.js 16.2.7（App Router + Turbopack） | ✅ | `params`/`searchParams` 全部 async |
+| React 19.2.4 + React-DOM 19.2.4 | ✅ | Next.js 16 硬约束 |
+| TypeScript 5.9.3（strict + noUncheckedIndexedAccess） | ✅ | TS6 暂不升 |
+| Tailwind v4（CSS-first config + 暗色主题） | ✅ | zinc base color |
+| shadcn/ui（手写 components.json + 4 个基础组件） | ✅ | Button / Card / Badge / Separator |
+| Biome 2.4.16（替代 ESLint） | ✅ | format + lint + organize imports |
+| Zustand 5（5 个 store） | ✅ | ui / session / streaming / workbench / observability |
+| Vitest 4.1.8（jsdom + @testing-library/react） | ✅ | 1 个示例测试（4 用例） |
+| API stub 端点（chat / ag-ui / a2ui / eval / replay） | ✅ | 返回 503 + 计划信息 |
+| 4 个 Lab 总览页 + 1.1.1 Markdown 占位（可点击模拟流式） | ✅ | 其它子页签占位 |
+| 首页（4 Lab 入口 + 最近会话） | ✅ | |
+| (labs) 共用 layout（左侧 Lab 导航 + 顶部模型选择） | ✅ | |
+| 主题切换（light / dark / system，跟随系统） | ✅ | `useUiStore.themeMode` + `<html class="dark">` |
+| 路径别名 `@/*` → `./src/*` | ✅ | tsconfig + vitest.config 双侧 |
+| 工程目录骨架（core/features/views/infra/lib） | ✅ | 每个 core 子目录有 README |
+
+### 10.2 当前可运行命令
+
+```bash
+npm run dev         # 启动 Next dev server（默认 3000）
+npm run build       # 生产构建（已验证，12 静态页 + 5 API 路由）
+npm run typecheck   # tsc --noEmit（已验证，0 错误）
+npm run lint        # Biome check（已验证，0 错误）
+npm run lint:fix    # 自动修复
+npm run format      # Biome format
+npm run test        # Vitest 单次
+npm run test:watch  # Vitest 监听
+npm run check-deps  # 重校对 npm latest 版本
+npm run typegen     # npx next typegen（生成 PageProps / LayoutProps 类型 helper）
+```
+
+### 10.3 W1 阶段验证
+
+- `npx tsc --noEmit` → **0 errors**
+- `npx biome check .` → **0 errors**（40 files checked）
+- `npx vitest run` → **4/4 passed**
+- `npx next build` → **Compiled in 1367ms**，12 静态页 + 5 API 路由全部成功
+- `npx next dev` → **Ready in 217ms**，所有路由返回 200，API 端点返回 stub JSON
+
+### 10.4 W1 → W2 衔接（下一步）
+
+按 PROPOSAL.md §4 节奏，**W2 目标**：
+
+1. `core/models/` 落地：实现 `ModelProvider` 接口 + 6 个 provider stub（OpenAI / Anthropic / Google / DeepSeek / Qwen / Ollama）
+2. `infra/http/` 落地：SSE 客户端封装（`fetch + ReadableStream`）
+3. `app/api/chat/route.ts` 真正实现：把前端 `simulateStream` 替换为真实 LLM 流
+4. `app/(labs)/streaming/markdown/page.tsx` 接入 `/api/chat`，从 SSE 推送改为真实流
+5. `core/state/session-store.ts` 接入 URL `searchParams`（`?model=gpt-4o&lab=streaming`）
+
+---
+
 ## 7. 你可以选的下一步
 
 | 选项 | 说明 | 预估 |
@@ -511,58 +570,66 @@ const isStreaming = useStreamingStore(s => s.isStreaming)
 > 校对时间：2026-06-09。所有版本均为 npm `latest` tag 的当前值。
 > 装包时统一用 `npm install <pkg>@latest`，避免锁住旧版本。
 
-| 包 | 版本 |
-| --- | --- |
-| next | **16.2.7** |
-| react | **19.2.7** |
-| react-dom | **19.2.7** |
-| typescript | **6.0.3** |
-| tailwindcss | **4.3.0** |
-| @tailwindcss/postcss | **4.3.0** |
-| @biomejs/biome | **2.4.16** |
-| zustand | **5.0.14** |
-| @tanstack/react-query | **5.101.0** |
-| react-markdown | **10.1.0** |
-| remark-gfm | **4.0.1** |
-| rehype-raw | **7.0.0** |
-| rehype-sanitize | **6.0.0** |
-| shiki | **4.2.0** |
-| expr-eval | **2.0.2** |
-| @babel/standalone | **7.29.7** |
-| react-resizable-panels | **4.11.2** |
-| @xyflow/react | **12.11.0** |
-| recharts | **3.8.1** |
-| jsondiffpatch | **0.7.6** |
-| react-hook-form | **7.78.0** |
-| zod | **4.4.3** |
-| vitest | **4.1.8** |
-| @testing-library/react | **16.3.2** |
-| @playwright/test | **1.60.0** |
-| idb-keyval | **6.2.5** |
-| @axe-core/react | **4.11.3** |
-| @radix-ui/react-dialog | **1.1.16** |
-| @radix-ui/react-tabs | **1.1.14** |
-| @radix-ui/react-slot | **1.2.5** |
-| lucide-react | **1.17.0** |
-| class-variance-authority | **0.7.1** |
-| clsx | **2.1.1** |
-| tailwind-merge | **3.6.0** |
+| 包 | 版本 | 备注 |
+| --- | --- | --- |
+| next | **16.2.7** | Next.js 16 GA，已用 Turbopack 默认 build |
+| react | **19.2.4** | Next.js 16 硬约束（npm latest 是19.2.7，但 Next16 类型定义要求19.2.4） |
+| react-dom | **19.2.4** | 同上 |
+| typescript | **5.9.3** | Next.js 16 实际配套；TS 6.0.3 与 Next16 类型不兼容，**W1 暂不升** |
+| @types/node | **22.13.0** | Vitest 4 + Vite 8 要求 ≥22.12 |
+| @types/react | **19.2.17** | |
+| @types/react-dom | **19.2.3** | |
+| tailwindcss | **4.3.0** | Tailwind v4（CSS-first config） |
+| @tailwindcss/postcss | **4.3.0** | Tailwind v4 PostCSS plugin |
+| @tailwindcss/typography | **0.5.20** | Markdown 渲染用 |
+| @biomejs/biome | **2.4.16** | 单仓统一 lint + format（替代 ESLint） |
+| zustand | **5.0.14** | 仅承担"跨组件 + 高频 + 不走 URL"的客户端态（见 §9） |
+| zod | **4.4.3** | 设置 / Prompt Lab 表单 schema |
+| idb-keyval | **6.2.5** | session 持久化 |
+| clsx | **2.1.1** | |
+| tailwind-merge | **3.6.0** | |
+| class-variance-authority | **0.7.1** | shadcn/ui Button variants |
+| lucide-react | **1.17.0** | 图标 |
+| @radix-ui/react-slot | **1.2.5** | shadcn/ui Button asChild |
+| @radix-ui/react-dialog | **1.1.16** | 命令面板/弹窗（预留） |
+| @radix-ui/react-tabs | **1.1.14** | |
+| vitest | **4.1.8** | 单元测试 |
+| @vitejs/plugin-react | **6.0.2** | Vitest React 插件 |
+| jsdom | **29.1.1** | Vitest DOM 环境 |
+| @testing-library/react | **16.3.2** | |
+| @testing-library/dom | **10.4.0** | |
+| @testing-library/jest-dom | **6.6.3** | |
+
+**未装的依赖（按 W 节奏后续补）**：
+
+- `react-markdown@10.1.0` + `remark-gfm@4.0.1` + `rehype-raw@7.0.0` + `rehype-sanitize@6.0.0` → **W3**
+- `shiki@4.2.0` → **W3**（代码高亮）
+- `@xyflow/react@12.11.0` → **W11**（Lab 4 推理 DAG）
+- `recharts@3.8.1` → **W11**（token 折线图）
+- `jsondiffpatch@0.7.6` → **W10**（协议解码器 diff）
+- `react-resizable-panels@4.11.2` → **W9**（Lab 3 三栏）
+- `react-hook-form@7.78.0` → **W3**（Prompt Lab）
+- `@axe-core/react@4.11.3` → **W11**（a11y 评分）
+- `@playwright/test@1.60.0` → **W11**（e2e）
+- `expr-eval@2.0.2` → **W6**（DSL 数据绑定）
+- `@babel/standalone@7.29.7` → **W7**（TSX 沙箱）
 
 **升级注意（重要）**：
 
-- **Next.js 15 → 16**：breaking 变更集中在 `next/image`、`next.config` 默认行为与异步 `cookies()` / `headers()`。安装前翻一遍 [Next.js 16 upgrade guide](https://nextjs.org/docs/app/building-your-application/upgrading/version-16)。
-- **TypeScript 5 → 6**：类型推断更严格，老代码可能冒出新的类型错误。
-- **Zod 3 → 4**：API 改名（如 `z.string().nonempty()` → `z.string().min(1)`），迁移前看 zod v4 迁移指南。
-- **Vitest 1 → 4**：配置与 API 有调整，沿用旧 snapshot/inline 测试需要适配。
-- **lucide-react 0 → 1**：图标命名空间有调整，可能影响现有 import。
+- **Next.js 16 breaking change**：`params` / `searchParams` / `cookies()` / `headers()` **全部 async**（必须 `await`），不再是同步访问。新代码必须用 `await props.params`。
+- **React 19.2 配套**：Next.js 16 锁死 React 19.2.4，不要强行升到19.2.7（类型会断）。
+- **TypeScript 6 暂不升**：Next.js 16 自带的 `eslint-config-next` 类型基于 TS5.x；强行升 TS6 会冒出类型错误。等 Next.js17 再统一升。
+- **Zod 4 API 已稳定**：从 v3 升级 v4 时注意 `z.string().nonempty()` → `z.string().min(1)` 等 API 改名。
+- **Vitest 4 配置**：默认走 `defineConfig` + 自带 Vite 8，无需 `vitest.config.ts` 暴露给 tsc（已从 tsconfig exclude）。
+- **lucide-react 0 → 1**：图标命名空间有调整，使用前先看 changelog。
 
 **校对脚本**（CI 里跑）：
 
 ```bash
 #!/usr/bin/env bash
-# scripts/check-deps.sh
+# scripts/check-deps.sh —— 校对 npm 最新版本
 set -euo pipefail
-declare -a pkgs=(
+pkgs=(
   next react react-dom typescript tailwindcss zustand zod
   react-markdown shiki @biomejs/biome vitest @xyflow/react
   recharts react-resizable-panels @tanstack/react-query
@@ -573,3 +640,9 @@ done
 ```
 
 输出若与本文档第 8 节不一致，要么更新文档、要么锁版本——不要默默装旧版。
+
+**已知 W1 妥协（待跟踪）**：
+
+1. TypeScript 6.0.3 在文档 §8 标注但**实际未升**（Next16 类型约束）。下次 Next.js 17 GA 时统一升。
+2. ESLint 仍装在 `node_modules`（因为 `eslint-config-next` 装过），但 `package.json` 已移除依赖、`biome.json` 是唯一定义。等下次 `npm prune` 自动清理。
+3. shadcn/ui 没走 `npx shadcn@latest init` 流程（因为目录非空 + 避免交互），改为手写 `components.json` + 4 个基础组件。后续用 `npx shadcn@latest add <component>` 加新组件。
