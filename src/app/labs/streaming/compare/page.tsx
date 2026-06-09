@@ -49,15 +49,15 @@ const PROTOCOLS: ProtocolInfo[] = [
   {
     id: "a2ui",
     label: "A2UI 协议",
-    status: "planned",
+    status: "done",
     description: "A2UI v0.2：surfaceUpdate + dataModelUpdate → 组件树",
     features: [
-      "surfaceUpdate 组件声明",
+      "surfaceUpdate 组件声明（card / chart / table / text）",
       "dataModelUpdate 数据绑定",
-      "a2uiAdapter（W5 落地）",
-      "/api/a2ui（W5 落地）",
-      "组件树视图 + diff",
-      "与 AG-UI 协议对照",
+      "a2uiAdapter 映射器",
+      "/api/a2ui mock SSE 端点",
+      "三栏视图（原始事件 / 组件树 / RenderableEvent）",
+      "与 Markdown / AG-UI 协议对照",
     ],
   },
 ];
