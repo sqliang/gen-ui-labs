@@ -255,8 +255,10 @@ app/
 | 样式 | **Tailwind CSS 4.3.0** + **CSS Variables** + `@tailwindcss/postcss` | token 化主题，暗色零成本 |
 | 组件库 | **shadcn/ui**（Radix 1.1.x + Tailwind 4.3 + `class-variance-authority` 0.7.1 + `clsx` 2.1.1 + `tailwind-merge` 3.6.0 + `lucide-react` 1.17.0） | Tailwind 原生、可复制可改、无版本锁 |
 | 头部 | **App Router + RSC + Server Actions** | 协议流用 RSC streaming |
-| 状态 | **Zustand 5.0.14**（客户端）+ **React Server State** | 轻量、无样板 |
+| 状态 | **Zustand 5.0.14**（仅承担"跨组件 + 高频 + 不走 URL"的客户端态） | 见 §9 分层状态管理原则 |
 | 数据获取 | **@tanstack/react-query 5.101.0**（如果需要缓存） | 视 Lab 4 仪表盘而定 |
+
+> **状态管理的核心思路**：不要"装一个 Zustand 管所有东西"。Next.js App Router 已经覆盖了大多数状态场景（Server Component 的 RSC、URL 的 searchParams、Server Actions），Zustand 只补最后一块短板——跨组件、高频、不入 URL 的纯客户端态。
 | 协议流 | **SSE（`ReadableStream`）+ WebSocket** | SSE 默认，WS 备选 |
 | Markdown | **react-markdown 10.1.0 + remark-gfm 4.0.1 + rehype-raw 7.0.0 + rehype-sanitize 6.0.0** | 流式 + 安全 |
 | 代码高亮 | **Shiki 4.2.0**（SSR 友好，主题多） | 暗色主题一致 |
@@ -415,6 +417,79 @@ gen-ui-labs/
 - **DSL 渐进**：从 JSON-UI 起，逐步引入表达式、状态、事件。**先能用，再好用**。
 - **沙箱永远在线**：任何 LLM 生成的 UI 代码默认在隔离环境跑。
 - **失败是数据**：失败模式库是核心资产，不是边角料。
+
+---
+
+## 9. 分层状态管理（避免 Zustand 滥用）
+
+> **核心问题**：用了 Next.js 之后还需要不要 Zustand？答：**需要，但只承担一类状态**。
+>
+> Next.js App Router 已经覆盖了大多数状态场景；Zustand 只补"跨组件、高频、不入 URL 的纯客户端态"这一块短板。
+
+### 9.1 Next.js 自带的状态承载
+
+| 机制 | 适用 |
+| --- | --- |
+| **RSC（Server Component）** | 服务端数据，按请求渲染，靠 `fetch` cache 控制失效 |
+| **Client Component + `useState` / `useReducer`** | 单组件临时态 |
+| **Client Component + Context** | 跨组件但低频（注意：Context 重渲染粒度粗） |
+| **URL `searchParams` / `pathname`** | 可分享 / 可前进后退的状态（当前路由、模型选择、过滤条件） |
+| **TanStack Query / RSC fetch** | 服务端数据缓存、轮询、乐观更新 |
+| **Server Actions + `useFormState`** | 写操作 |
+
+### 9.2 GenUI Labs 的状态分类与归属
+
+| 状态 | 归谁管 | 理由 |
+| --- | --- | --- |
+| 会话列表 / 当前 session 元数据 | **RSC + TanStack Query** | 服务端数据，按需缓存 |
+| 当前 Lab 路由 / 模型选择 / 过滤条件 | **URL `searchParams`** | 可分享、可前进后退、可 SSR |
+| **协议事件流**（Lab 1 SSE chunk） | **Zustand `streamingStore`** | 高频追加、跨面板订阅、不入 URL |
+| **Lab 3 Workbench 三栏宽度 / 选中节点 / scrubber 位置** | **Zustand `workbenchStore`** | 高频拖拽 / 高频点击，不能写 URL |
+| **Lab 4 实时 token 计数 / 工具调用日志** | **Zustand `observabilityStore`** | 高频追加，跨仪表盘面板订阅 |
+| **全局 UI 偏好（主题、布局、命令面板开合）** | **Zustand + `persist` middleware** | 跨 Lab、全局生效 |
+| 表单输入 | **`react-hook-form` 自带** | 不污染 store |
+| 单组件临时态 | **`useState` / `useReducer`** | 不抽 store |
+| 沙箱 iframe 内部状态 | **postMessage**（不进 store） | 沙箱自治 |
+
+### 9.3 Store 划分（落地结构）
+
+```
+src/core/state/
+├─ ui-store.ts             # 主题、命令面板、布局（persist → LocalStorage）
+├─ session-store.ts        # 当前 sessionId、当前模型（URL 为主，store 缓存）
+├─ streaming-store.ts      # 协议事件流（append-only，不持久化）
+├─ workbench-store.ts      # Lab 3 三栏宽度、选中节点、scrubber
+└─ observability-store.ts  # Lab 4 token、工具调用日志
+```
+
+每个 store 用 **selector 精准订阅**，避免 Context 那种"一变全变"的问题：
+
+```ts
+// 错误：订阅整个 store，任何字段变化都重渲
+const { chunks, isStreaming } = useStreamingStore()
+
+// 正确：每个字段独立 selector，只在该字段变化时重渲
+const chunks = useStreamingStore(s => s.chunks)
+const isStreaming = useStreamingStore(s => s.isStreaming)
+```
+
+### 9.4 何时不要 Zustand
+
+- **能进 URL 的就进 URL**（searchParams / hash）。URL 是 Next.js 的一等公民，免费拿到可分享 + SSR + 前进后退
+- **能用 RSC fetch 的就用 RSC**（默认就是 Server Component，别无脑 `"use client"`）
+- **能用 `useState` 就别抽 store**（升一级组件 / prop drilling 通常比 store 更清晰）
+- **能用 `react-hook-form` 的表单状态就别进全局 store**
+- **只在"跨组件 + 高频 + 不入 URL"才用 Zustand**
+
+### 9.5 反模式（要避开）
+
+| 反模式 | 为什么坏 |
+| --- | --- |
+| 整个 App 一个大 store | 重渲染雪崩、selector 难写、团队协作冲突 |
+| 把 URL 状态塞进 store | 失去分享性、SSR 不友好、刷新丢状态 |
+| 把表单未提交值塞进 store | 用 `react-hook-form` 自带即可 |
+| 用 Context 顶替 Zustand | Context 在高频更新下重渲染粒度粗 |
+| 服务端数据进 Zustand | 那是 TanStack Query / RSC 的活，store 不知道缓存失效 |
 
 ---
 
