@@ -633,14 +633,54 @@ npm run typegen     # npx next typegen（生成 PageProps / LayoutProps 类型 h
 - /api/chat 路由用 Zod 4 校验，**让错误前置到 400**
 - /api/chat 接 `request.signal`，**client abort 时 provider.stream 也会停**
 
-**W3 → W4 衔接（下一步）**：
+**W3 → W4 衔接（W4-4 已完成 ✅）**
 
-按 PROPOSAL.md §4 节奏，**W4 目标**：
+按 PROPOSAL.md §10.4，**W4-4（markdown 页全面升级）已完成**：
 
-1. W4-1：接 Anthropic Messages API（x-api-key + anthropic-version + 自己的 SSE 事件格式：content_block_delta 等）
-2. W4-2：接 Google Gemini generateContent（API Key 走 URL query，SSE 嵌套 JSON 需要自定义解析）
-3. W4-3：AG-UI 协议：把 RenderableEvent 拆到 core/protocols/common/，让 stream 既能走 LLM 原生协议也能走 AG-UI 事件流
-4. W4-4：把 markdown 页（W1 占位）真正升级为 W2+W3 全部能力的展示（接 /api/chat 真 SSE + 渲染 react-markdown + 4 个 preset + AbortController）
+1. ✅ src/app/labs/streaming/markdown/page.tsx 全面重写
+   - 接 /api/chat 真 SSE（fetchSse + AbortController + request.signal 透传）
+   - 接 MarkdownRenderer（react-markdown v10 + GFM + rehype-highlight）
+   - 4 个 preset（react demo / ag-ui / a2ui / json-ui）+ 自定义 prompt
+   - mock / api 双 source 切换
+   - 错误态：api 模式 env 缺失时显示错误卡
+   - meta chunk 解析：firstTokenLatencyMs / totalDurationMs
+   - 成功完成时 observability-store.addTokenUsage 落库（按 model 累计）
+2. ✅ src/core/render/extract-metrics.ts：从 chunks 抽 firstTokenLatency / totalDuration
+3. ✅ tests/unit/core/extract-metrics.test.ts：6 用例（空数组 / 第一个meta / 无meta / 非数字 / firstToken只取第一个 / totalDuration取最后一个）
+
+**W4-4 验证**：
+
+- `npx tsc --noEmit` → **0 errors**
+- `npx biome check .` → **0 errors**（66 files）
+- `npx vitest run` → **62/62 passed**（+6 from W3）
+- `npx next build` → 12 静态页 + 5 API 路由
+- `npx next dev` → Ready in **183ms**
+- **dev 端到端**（curl + 浏览器）：
+  - mock 模式：521 字符 / 67 chunks / H1+H2+粗体+列表+代码块+引用块全渲染
+  - api 模式（claude-sonnet-4-5 + mock-base）：427 字符 / 57 chunks / 同样全渲染
+  - api 模式（gpt-4o-mini + 无 env）：**红色错误卡显示「OPENAI_API_KEY not set」**——env-controlled 兜底验证成功
+  - 切换模型：topbar 切换 → topbar 标签 / model badge 同步更新
+  - 停止 / 清空按钮：enable/disable 状态正确
+
+**W4-4 端到端**：用户在浏览器跑：
+
+1. /labs/streaming/markdown → 看到完整 UI（4 preset + source 切换 + 自定义 prompt + 3 个操作按钮）
+2. 选 mock → 点「开始流式渲染」→ 521 字符/67 chunks 边生成边渲染
+3. 切到 api + 选 anthropic（走 mock-base）→ 427 字符/57 chunks
+4. 切到 api + 选 openai（无 key）→ 红色错误卡
+5. 顶部 topbar 切换模型 → 整页 model badge 同步
+
+**W4 仍未完成的部分（建议 W4-5/6/7）：**
+
+1. W4-1：接 Anthropic Messages API（自家 SSE 格式：content_block_delta 等）
+2. W4-2：接 Google Gemini generateContent（URL query key + 嵌套 JSON SSE）
+3. W4-3：AG-UI 协议层（core/protocols/common/）—— 拆 RenderableEvent
+4. W4-7：lab-topbar.tsx 的 BUILTIN_MODELS 还引 session-store 的旧版（8 个），跟 core/models/registry 新版（13 个）不一致，**下次顺手统一**
+
+**W3 review 已知 bug**：
+
+- markdown 页 W2 commit 写"完成"但实际文件没进 git（路径 `(labs)/` 被误删）
+  - **W4-4 已修**——文件现在真在 `src/app/labs/streaming/markdown/page.tsx`，完整接 SSE + 渲染
 
 ---
 
