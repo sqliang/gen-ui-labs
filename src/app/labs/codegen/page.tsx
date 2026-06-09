@@ -1,45 +1,73 @@
-import { LabOverview } from "@/views/lab-overview";
+"use client";
 
-const FEATURES = [
+import Link from "next/link";
+
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+
+const labs = [
   {
-    label: "2.1.1 React/TSX 代码生成",
-    desc: "LLM 输出 TSX 字符串，运行时沙箱编译（@babel/standalone）",
-    badge: "W7",
+    path: "/labs/codegen/json-ui",
+    title: "2.1.2 JSON-UI DSL",
+    status: "done",
+    desc: "JSON-UI 声明式 DSL → React 递归渲染。card / table / button / chart。",
+    features: "W6 落地：JsonUiRenderer + /api/json-ui mock 端点",
   },
   {
-    label: "2.1.2 JSON-UI DSL 生成",
-    desc: "LLM 输出结构化 JSON（树形组件），前端映射到本地组件树渲染",
-    badge: "W6",
+    path: "/labs/codegen/tsx",
+    title: "2.1.1 TSX 代码生成",
+    status: "planned",
+    desc: "LLM 生成 React TSX 代码 → iframe 沙箱执行 → 实时渲染。",
+    features: "W7 落地：core/engine/sandbox/ + babel standalone",
   },
   {
-    label: "2.1.3 混合：DSL + 自由代码",
-    desc: "顶层用 DSL 描述布局/数据流，叶子节点允许内联小段 JSX",
-    badge: "W7",
-  },
-  {
-    label: "2.1.4 低代码（LCDP）引擎渲染",
-    desc: "把 DSL 视作低代码页面定义，实现属性面板/数据源绑定/事件编排",
-    badge: "W11",
-  },
-  {
-    label: "2.1.5 代码 → DSL 反向",
-    desc: "把生成的 TSX 解析回 DSL，方便后续用 Lab 3 调试",
-    badge: "W10",
-  },
-  {
-    label: "2.1.6 多模型对比",
-    desc: "同 prompt 用 GPT-4.1 / Claude Sonnet / Qwen / DeepSeek 等生成",
-    badge: "W11",
+    path: "/labs/codegen/mixed",
+    title: "2.1.3 混合（DSL + TSX）",
+    status: "planned",
+    desc: "LLM 自选 DSL 或 TSX → 统一渲染管道 → 对照评估。",
+    features: "W7 落地：DSL/TSX 混合路由 + 质量评分",
   },
 ];
 
-export default function CodegenLabOverview() {
+export default function CodegenPage() {
   return (
-    <LabOverview
-      labId="codegen"
-      title="Lab 2 · Generate UI Code & DSL"
-      tagline="研究 LLM 产出 UI 的两种典型形态——直接可执行代码 vs. DSL → 引擎渲染。"
-      features={FEATURES}
-    />
+    <div className="mx-auto w-full max-w-4xl px-6 py-8">
+      <header className="mb-6">
+        <h1 className="text-xl font-bold tracking-tight">Lab 2 · Codegen</h1>
+        <p className="text-muted-foreground mt-1 text-sm">
+          LLM 生成 UI 代码 / DSL → 渲染引擎 → 沙箱执行
+        </p>
+      </header>
+
+      <div className="grid gap-4 md:grid-cols-3">
+        {labs.map((lab) => (
+          <Card key={lab.path} className="flex flex-col">
+            <CardHeader className="p-4 pb-2">
+              <div className="flex items-center gap-2">
+                <CardTitle className="text-sm">{lab.title}</CardTitle>
+                <Badge
+                  variant="outline"
+                  className={
+                    lab.status === "done"
+                      ? "border-green-500 text-green-600 text-[10px]"
+                      : "text-[10px]"
+                  }
+                >
+                  {lab.status === "done" ? "✅" : "📋"}
+                </Badge>
+              </div>
+            </CardHeader>
+            <CardContent className="flex-1 p-4 pt-0">
+              <p className="text-muted-foreground mb-3 text-xs">{lab.desc}</p>
+              <p className="text-muted-foreground mb-3 text-[10px]">{lab.features}</p>
+              <Button asChild size="sm" variant="outline" className="mt-auto w-full">
+                <Link href={lab.path}>{lab.status === "done" ? "打开" : "占位"}</Link>
+              </Button>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+    </div>
   );
 }
