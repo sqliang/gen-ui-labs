@@ -1,35 +1,53 @@
 "use client";
 
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useRef } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { JsonUiRenderer } from "@/core/engine/json-ui/renderer";
-import type { JsonUiDocument, JsonUiPatch } from "@/core/engine/json-ui/types";
-import { fetchSse } from "@/infra/http/sse-client";
+import type { JsonUiDocument } from "@/core/engine/json-ui/types";
 
-/** 同一 UI 的两种表达 */
-const SAME_UI_DSL = `{
-  "root": {
-    "type": "card",
-    "props": { "title": "GenUI Labs · 混合演示" },
-    "children": [
-      { "type": "text", "props": { "content": "同一 UI，两种表达方式：JSON-UI DSL（左） vs TSX（右）" } },
-      { "type": "flex", "props": {}, "children": [
-        { "type": "button", "props": { "label": "✅ DSL", "variant": "default" } },
-        { "type": "button", "props": { "label": "✅ TSX", "variant": "outline" } },
-        { "type": "button", "props": { "label": "📋 混合", "variant": "outline" } }
-      ]},
-      { "type": "table", "props": {
-        "columns": ["Week", "Status"],
-        "rows": [["W1", "✅"],["W2","✅"],["W3","✅"],["W4","✅"],["W5","✅"],["W6","✅"],["W7","✅"],["W8","✅"]]
-      }}
-    ]
-  }
-}`;
+/** 同一 UI 的 DSL 表达（JSON-UI 格式） */
+const DSL_DOC: JsonUiDocument = {
+  root: {
+    type: "card",
+    props: { title: "GenUI Labs · 混合演示" },
+    children: [
+      {
+        type: "text",
+        props: { content: "同一 UI，两种表达方式：JSON-UI DSL（左） vs TSX（右）" },
+      },
+      {
+        type: "flex",
+        props: {},
+        children: [
+          { type: "button", props: { label: "✅ DSL", variant: "default" } },
+          { type: "button", props: { label: "✅ TSX", variant: "outline" } },
+          { type: "button", props: { label: "📋 混合", variant: "outline" } },
+        ],
+      },
+      {
+        type: "table",
+        props: {
+          columns: ["Week", "Status"],
+          rows: [
+            ["W1", "✅"],
+            ["W2", "✅"],
+            ["W3", "✅"],
+            ["W4", "✅"],
+            ["W5", "✅"],
+            ["W6", "✅"],
+            ["W7", "✅"],
+            ["W8", "✅"],
+          ],
+        },
+      },
+    ],
+  },
+};
 
-const TSX_EQUIVALENT = `// 同等的 TSX 代码（沙箱执行）
-var card = document.createElement('div');
+/** 同等 TSX 代码（纯 JS DOM，沙箱执行） */
+const TSX_CODE = `var card = document.createElement('div');
 card.style.border = '1px solid #27272a';
 card.style.borderRadius = '8px';
 card.style.padding = '16px';
@@ -53,14 +71,14 @@ var flex = document.createElement('div');
 flex.style.display = 'flex';
 flex.style.gap = '8px';
 flex.style.marginBottom = '12px';
-['✅ DSL', '✅ TSX', '📋 混合'].forEach(function(label) {
+['✅ DSL','✅ TSX','📋 混合'].forEach(function(label) {
   var btn = document.createElement('button');
   btn.textContent = label;
   btn.style.padding = '4px 12px';
   btn.style.borderRadius = '6px';
   btn.style.border = '1px solid #27272a';
-  btn.style.background = label.includes('DSL') ? '#3b82f6' : 'transparent';
-  btn.style.color = label.includes('DSL') ? 'white' : '#a1a1aa';
+  btn.style.background = label.indexOf('DSL')>=0 ? '#3b82f6' : 'transparent';
+  btn.style.color = label.indexOf('DSL')>=0 ? 'white' : '#a1a1aa';
   btn.style.fontSize = '12px';
   btn.style.cursor = 'pointer';
   flex.appendChild(btn);
@@ -70,81 +88,32 @@ card.appendChild(flex);
 var table = document.createElement('table');
 table.style.width = '100%';
 table.style.borderCollapse = 'collapse';
-var rows = [['Week','Status'],['W1','✅'],['W2','✅'],['W3','✅'],['W4','✅'],['W5','✅'],['W6','✅'],['W7','✅'],['W8','✅']];
-rows.forEach(function(row, ri) {
-  var tr = document.createElement('tr');
-  tr.style.borderBottom = '1px solid #18181b';
-  row.forEach(function(cell) {
-    var td = document.createElement(ri === 0 ? 'th' : 'td');
-    td.style.padding = '6px 8px';
-    td.style.fontSize = '12px';
-    td.style.textAlign = 'left';
-    td.style.color = ri === 0 ? '#a1a1aa' : '#e5e5e5';
-    td.textContent = cell;
-    tr.appendChild(td);
+[['Week','Status'],['W1','✅'],['W2','✅'],['W3','✅'],['W4','✅'],['W5','✅'],['W6','✅'],['W7','✅'],['W8','✅']]
+  .forEach(function(row, ri) {
+    var tr = document.createElement('tr');
+    tr.style.borderBottom = '1px solid #18181b';
+    row.forEach(function(cell) {
+      var td = document.createElement(ri===0?'th':'td');
+      td.style.padding = '6px 8px';
+      td.style.fontSize = '12px';
+      td.style.textAlign = 'left';
+      td.style.color = ri===0?'#a1a1aa':'#e5e5e5';
+      td.textContent = cell;
+      tr.appendChild(td);
+    });
+    table.appendChild(tr);
   });
-  table.appendChild(tr);
-});
 card.appendChild(table);
 
 document.getElementById('root').appendChild(card);`;
 
-function applyPatch(doc: JsonUiDocument, patch: JsonUiPatch): JsonUiDocument {
-  const parts = patch.path.split("/").filter(Boolean);
-  if (parts[0] !== "root") return doc;
-  if (parts.length === 1) {
-    doc.root = patch.value as JsonUiDocument["root"];
-    return { ...doc };
-  }
-  let current: Record<string, unknown> = doc.root as unknown as Record<string, unknown>;
-  for (let i = 1; i < parts.length - 1; i++) {
-    const key = parts[i];
-    if (!key) break;
-    const next = current[key] as Record<string, unknown> | undefined;
-    if (!next) break;
-    current = next;
-  }
-  const lastKey = parts[parts.length - 1];
-  if (lastKey) current[lastKey] = patch.value;
-  return { ...doc, root: { ...doc.root } };
-}
-
 export default function MixedPage() {
   const iframeRef = useRef<HTMLIFrameElement>(null);
-  const [dslDoc, setDslDoc] = useState<JsonUiDocument>(() => ({
-    root: { type: "text", props: { content: "点击「加载 DSL」" } },
-  }));
-  const [patches, setPatches] = useState<JsonUiPatch[]>([]);
-  const [loading, setLoading] = useState(false);
-
-  const loadDsl = useCallback(async () => {
-    setLoading(true);
-    setPatches([]);
-    let doc: JsonUiDocument = { root: { type: "text", props: { content: "加载中…" } } };
-    try {
-      for await (const evt of fetchSse("/api/json-ui", { body: {} })) {
-        let patch: JsonUiPatch;
-        try {
-          patch = JSON.parse(evt.data) as JsonUiPatch;
-        } catch {
-          continue;
-        }
-        setPatches((prev) => [...prev, patch]);
-        doc = applyPatch(doc, patch);
-        setDslDoc(doc);
-      }
-    } catch {
-      doc = { root: { type: "text", props: { content: "加载失败" } } };
-      setDslDoc(doc);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
 
   const runTsx = useCallback(() => {
     if (!iframeRef.current?.contentWindow) return;
     iframeRef.current.contentWindow.postMessage(
-      { id: Date.now(), code: TSX_EQUIVALENT },
+      { id: Date.now(), code: TSX_CODE },
       window.location.origin,
     );
   }, []);
@@ -164,20 +133,17 @@ export default function MixedPage() {
       <div className="grid grid-cols-2 gap-4">
         {/* 左：JSON-UI DSL */}
         <Card>
-          <CardHeader className="flex flex-row items-center justify-between p-3">
+          <CardHeader className="p-3">
             <CardTitle className="text-sm">
               JSON-UI DSL 管道
               <Badge variant="secondary" className="ml-2 text-[9px]">
-                /api/json-ui → JsonUiRenderer
+                JsonUiRenderer
               </Badge>
             </CardTitle>
-            <Button size="sm" onClick={loadDsl} disabled={loading}>
-              {loading ? "加载中…" : "加载 DSL"}
-            </Button>
           </CardHeader>
           <CardContent className="p-3 pt-0">
             <div className="min-h-[20rem]">
-              <JsonUiRenderer node={dslDoc.root} />
+              <JsonUiRenderer node={DSL_DOC.root} />
             </div>
           </CardContent>
         </Card>
@@ -209,7 +175,7 @@ export default function MixedPage() {
         </Card>
       </div>
 
-      {/* 对照说明 */}
+      {/* 对照评估 */}
       <Card className="mt-4">
         <CardHeader className="p-3">
           <CardTitle className="text-sm">对照评估</CardTitle>
@@ -230,7 +196,7 @@ export default function MixedPage() {
               <p className="text-primary font-bold">TSX Sandbox</p>
               <p className="text-muted-foreground">
                 ✅ 图灵完备（任意 UI 均可表达）
-                <br />✅ 开发者友好（熟悉的 React/JS）
+                <br />✅ 开发者友好（熟悉的 JS）
                 <br />
                 ⚠️ 安全需要沙箱隔离
                 <br />
