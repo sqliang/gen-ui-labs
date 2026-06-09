@@ -6,7 +6,7 @@ export type RenderableEvent =
   | { kind: "component"; op: "mount" | "patch" | "unmount"; id: string }
   | { kind: "state"; path: string; value: unknown }
   | { kind: "tool"; name: string; args: unknown }
-  | { kind: "control"; type: "start" | "end" | "error"; meta?: unknown };
+  | { kind: "control"; type: "start" | "end" | "error" | "meta"; meta?: unknown };
 
 interface StreamingState {
   // === 状态 ===

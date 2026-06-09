@@ -1,11 +1,11 @@
-import { describe, expect, it } from "vitest";
-
+import { describe, expect, it, vi } from "vitest";
 import {
   BUILTIN_MODELS,
   BUILTIN_PROVIDERS,
   findModel,
   getModelProvider,
   getProviderById,
+  ModelProviderError,
   type StreamChunk,
 } from "@/core/models";
 
@@ -46,9 +46,19 @@ describe("core/models/router", () => {
     expect(getModelProvider("ollama:llama3.1").id).toBe("ollama");
   });
 
-  it("getModelProvider 未知 id 不抛错（mock 兜底）", () => {
+  it("getModelProvider 未知 id：dev 静默兜底（默认 test 是 dev）", () => {
+    // NODE_ENV 在 vitest 默认是 'test'，不是 'production'，所以走兜底
     const p = getModelProvider("nonexistent-model");
-    expect(p.id).toBe("openai"); // makeMockProvider("openai") 兜底
+    expect(p.id).toBe("openai");
+  });
+
+  it("getModelProvider 未知 id：prod 抛 ModelProviderError", () => {
+    vi.stubEnv("NODE_ENV", "production");
+    try {
+      expect(() => getModelProvider("nonexistent-model")).toThrow(ModelProviderError);
+    } finally {
+      vi.unstubAllEnvs();
+    }
   });
 
   it("getProviderById 直接拿 provider", () => {
@@ -64,12 +74,13 @@ describe("core/models/router", () => {
 
 describe("core/models/providers mock 流式", () => {
   it("W2 mock: stream() 产出 start → text chunks → end", async () => {
-    const provider = getModelProvider("gpt-4o-mini");
+    // 用 anthropic 跑 mock 测试（env-controlled providers 在测试环境抛错）
+    const provider = getModelProvider("claude-sonnet-4-5");
     const ctrl = new AbortController();
     const events: StreamChunk[] = [];
 
     for await (const evt of provider.stream(
-      { model: "gpt-4o-mini", messages: [{ role: "user", content: "react demo" }] },
+      { model: "claude-sonnet-4-5", messages: [{ role: "user", content: "react demo" }] },
       ctrl.signal,
     )) {
       events.push(evt);
@@ -90,12 +101,12 @@ describe("core/models/providers mock 流式", () => {
   });
 
   it("W2 mock: 不同 prompt 走不同脚本", async () => {
-    const provider = getModelProvider("gpt-4o-mini");
+    const provider = getModelProvider("claude-sonnet-4-5");
     const ctrl = new AbortController();
     const texts: string[] = [];
 
     for await (const evt of provider.stream(
-      { model: "gpt-4o-mini", messages: [{ role: "user", content: "ag-ui" }] },
+      { model: "claude-sonnet-4-5", messages: [{ role: "user", content: "ag-ui" }] },
       ctrl.signal,
     )) {
       if (evt.kind === "text") texts.push(evt.delta);
@@ -105,10 +116,10 @@ describe("core/models/providers mock 流式", () => {
   });
 
   it("generate() 返回完整响应", async () => {
-    const provider = getModelProvider("gpt-4o-mini");
+    const provider = getModelProvider("claude-sonnet-4-5");
     const ctrl = new AbortController();
     const resp = await provider.generate(
-      { model: "gpt-4o-mini", messages: [{ role: "user", content: "hi" }] },
+      { model: "claude-sonnet-4-5", messages: [{ role: "user", content: "hi" }] },
       ctrl.signal,
     );
     expect(resp.content.length).toBeGreaterThan(0);
@@ -117,7 +128,7 @@ describe("core/models/providers mock 流式", () => {
   });
 
   it("abort signal 立即中断", async () => {
-    const provider = getModelProvider("gpt-4o-mini");
+    const provider = getModelProvider("claude-sonnet-4-5");
     const ctrl = new AbortController();
     let count = 0;
 
@@ -126,7 +137,7 @@ describe("core/models/providers mock 流式", () => {
 
     try {
       for await (const _evt of provider.stream(
-        { model: "gpt-4o-mini", messages: [{ role: "user", content: "hi" }] },
+        { model: "claude-sonnet-4-5", messages: [{ role: "user", content: "hi" }] },
         ctrl.signal,
       )) {
         count++;

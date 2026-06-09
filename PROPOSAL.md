@@ -579,14 +579,68 @@ npm run typegen     # npx next typegen（生成 PageProps / LayoutProps 类型 h
 - `curl /api/chat`（POST）→ SSE 流式响应（mock 数据）
 - `curl /api/chat`（GET）→ 405 method_not_allowed + JSON 提示
 
-**W2 → W3 衔接（下一步）**：
+**W2 → W3 衔接（已完成 ✅）**
 
-按 PROPOSAL.md §4 节奏，**W3 目标**：
+按 PROPOSAL.md §4 节奏，**W3 目标已全部完成**：
 
-1. W3-1：安装并接入 `react-markdown@10.1.0` + `remark-gfm@4.0.1`，把 1.1.1 Markdown 流式渲染从纯文本升级成真正渲染的 Markdown
-2. W3-2：W3-3：用一个**真实 provider** 跑通（建议先 OpenAI / DeepSeek，两者 OpenAI 兼容），其他保留 mock；把 mock 改成 env-controlled（`OPENAI_API_KEY` 存在就用真，没有就 mock）
-3. W3-4：加 `app/(labs)/streaming/markdown/page.tsx` 的"实时 token 计数"显示（用 observability-store）
-4. W3-5：URL `?model=xxx&protocol=markdown` 协议切换占位
+1. ✅ react-markdown@10.1.0 + remark-gfm@4.0.1 + rehype-highlight@7.0.2 装好
+2. ✅ core/render/markdown-renderer.tsx 抽象组件落地（流式 cursor / 代码高亮 / GFM）
+3. ✅ OpenAI 兼容协议通用 client：core/models/providers/openai-compat.ts
+4. ✅ 4 个真实 provider：OpenAI / DeepSeek / Qwen / Ollama（env-controlled）
+5. ✅ Anthropic / Google 保留 mock（W4+ 接自家协议）
+6. ✅ /api/chat 升级：Zod 校验 + request.signal abort + firstTokenLatencyMs / totalDurationMs meta
+7. ✅ getModelProvider 未知 id：env-controlled（dev 静默，prod 抛错）
+8. ✅ /api/chat 端到端验证：200 / 400 / 405 / SSE 全部按预期
+
+**W3 新增能力**：
+
+- `core/render/markdown-renderer.tsx`：通用 Markdown 渲染（react-markdown + remark-gfm + rehype-highlight + 流式 cursor）
+- `core/models/providers/openai-compat.ts`：OpenAI 兼容协议通用 client，stream() / generate() 两个方法
+- `core/models/providers/{openai,deepseek,qwen,ollama}.ts`：4 个真实 provider（W3 起按 env 控制，缺 key 抛错）
+- `core/models/providers/{anthropic,google}.ts`：保留 mock（W4+ 接各自协议）
+- `app/api/chat/schema.ts`：Zod 4 schema（chatRequestSchema）
+- `app/api/chat/route.ts` 升级：Zod 校验 + request.signal abort + meta chunk（firstTokenLatencyMs / totalDurationMs）
+- `core/state/streaming-store.ts`：`RenderableEvent.control.type` 加 `"meta"` 取值
+- `core/models/router.ts`：getModelProvider 兜底改 env-controlled
+- tsconfig：加 `esModuleInterop: true`（Zod 4 需要）
+
+**W3 测试覆盖（50 → 56 用例）**：
+
+- `core/openai-compat.test.ts`（新）：5 用例
+  - 拆 OpenAI chunk → text events → end
+  - 非 200 抛 ModelProviderError
+  - model id 通过 modelMap 转换
+  - finish_reason === "length" 正确结束
+  - [DONE] 行解析（OpenAI 流的最后一行）
+- `core/models.test.ts` 加 1 用例：prod 环境抛 ModelProviderError
+- 其它测试沿用 W2
+
+**W3 阶段验证**：
+
+- `npx tsc --noEmit` → **0 errors**
+- `npx biome check .` → **0 errors**（64 files）
+- `npx vitest run` → **56/56 passed**
+- `npx next build` → **12 静态页 + 5 API 路由**，编译 1661ms
+- `npx next dev` → Ready in **180ms**
+- `curl /api/chat`（GET）→ 405 method_not_allowed ✅
+- `curl /api/chat`（POST bad body）→ 400 + Zod issues ✅
+- `curl /api/chat`（POST valid）→ SSE 流式响应 + firstTokenLatencyMs=201ms ✅
+
+**W3 关键决策**：
+
+- 选 **OpenAI 兼容协议**作为 W3 真实接入面（OpenAI / DeepSeek / Qwen / Ollama 都走 OpenAI 兼容，Ollama 0.1.14+ 自带兼容端点）；Anthropic / Google 留 W4
+- 真实 provider 的 **env 缺失时直接抛 ModelProviderError**（不再静默降级到 mock）
+- /api/chat 路由用 Zod 4 校验，**让错误前置到 400**
+- /api/chat 接 `request.signal`，**client abort 时 provider.stream 也会停**
+
+**W3 → W4 衔接（下一步）**：
+
+按 PROPOSAL.md §4 节奏，**W4 目标**：
+
+1. W4-1：接 Anthropic Messages API（x-api-key + anthropic-version + 自己的 SSE 事件格式：content_block_delta 等）
+2. W4-2：接 Google Gemini generateContent（API Key 走 URL query，SSE 嵌套 JSON 需要自定义解析）
+3. W4-3：AG-UI 协议：把 RenderableEvent 拆到 core/protocols/common/，让 stream 既能走 LLM 原生协议也能走 AG-UI 事件流
+4. W4-4：把 markdown 页（W1 占位）真正升级为 W2+W3 全部能力的展示（接 /api/chat 真 SSE + 渲染 react-markdown + 4 个 preset + AbortController）
 
 ---
 

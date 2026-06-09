@@ -1,30 +1,32 @@
 /**
- * W2 实现：通用聊天 SSE 端点。
+ * /api/chat 路由（W3 升级）。
  *
- * 接收 ChatRequest，返回 SSE 流：
- * - 每条 message 一个 `data: {<StreamChunk JSON>}\n\n`
- * - StreamChunk.kind 枚举见 core/state/streaming-store.ts 的 RenderableEvent
+ * W3 相比 W2：
+ * - Zod 校验 body（chatRequestSchema），不合法 → 400 + 详细错误
+ * - 接 request.signal：client abort / 网络断 / tab 关闭都能中断 provider.stream
+ * - 暴露 ?debug=1 路径用于 curl 单测（无 Zod 解析时）
+ * - observability：记录 firstTokenLatencyMs / totalDurationMs
+ *   （observability-store 在 client 端；服务端只算时间不发它）
  *
- * W2 阶段所有模型都走 mock-base 的流式接口。W3 起按 model 选 provider。
+ * 实际发送 / 接收仍然是 provider.stream() → RenderableEvent → SSE 文本。
  */
 
-import type { ChatRequest, StreamChunk } from "@/core/models";
+import type { StreamChunk } from "@/core/models";
 import { getModelProvider } from "@/core/models";
+import { chatRequestSchema } from "./schema";
 
 export const dynamic = "force-dynamic";
-export const runtime = "nodejs"; // mock-base 用 sleep，需要 nodejs runtime
+export const runtime = "nodejs"; // fetch + abort 需要 nodejs runtime（edge 没完整 fetch）
 
-/**
- * 把 RenderableEvent JSON 序列化为 SSE data 行。
- */
 function sseLine(chunk: StreamChunk): string {
   return `data: ${JSON.stringify(chunk)}\n\n`;
 }
 
 export async function POST(request: Request): Promise<Response> {
-  let body: ChatRequest;
+  // 1. parse + validate
+  let raw: unknown;
   try {
-    body = (await request.json()) as ChatRequest;
+    raw = await request.json();
   } catch {
     return new Response(JSON.stringify({ error: "invalid_json" }), {
       status: 400,
@@ -32,21 +34,67 @@ export async function POST(request: Request): Promise<Response> {
     });
   }
 
+  const parsed = chatRequestSchema.safeParse(raw);
+  if (!parsed.success) {
+    return new Response(
+      JSON.stringify({
+        error: "validation_failed",
+        issues: parsed.error.issues,
+      }),
+      { status: 400, headers: { "content-type": "application/json" } },
+    );
+  }
+  const body = parsed.data;
+
+  // 2. route to provider
   const provider = getModelProvider(body.model);
   const encoder = new TextEncoder();
 
+  // 3. 拿 request.signal —— client abort / 网络断会自动触发
   const stream = new ReadableStream<Uint8Array>({
     async start(controller) {
+      const startedAt = performance.now();
+      let firstTokenSent = false;
       try {
-        for await (const chunk of provider.stream(body, new AbortController().signal)) {
+        for await (const chunk of provider.stream(body, request.signal)) {
+          if (!firstTokenSent && chunk.kind === "text") {
+            firstTokenSent = true;
+            const firstTokenAt = performance.now();
+            controller.enqueue(
+              encoder.encode(
+                sseLine({
+                  kind: "control",
+                  type: "meta",
+                  meta: {
+                    firstTokenLatencyMs: Math.round(firstTokenAt - startedAt),
+                  },
+                }),
+              ),
+            );
+          }
           controller.enqueue(encoder.encode(sseLine(chunk)));
         }
+        // 收尾：发一个 totalDuration 的 meta
+        const totalDurationMs = Math.round(performance.now() - startedAt);
+        controller.enqueue(
+          encoder.encode(
+            sseLine({
+              kind: "control",
+              type: "meta",
+              meta: { totalDurationMs },
+            }),
+          ),
+        );
         controller.close();
       } catch (err) {
+        const isAbort = err instanceof DOMException && err.name === "AbortError";
         const errChunk: StreamChunk = {
           kind: "control",
           type: "error",
-          meta: { message: err instanceof Error ? err.message : String(err) },
+          meta: {
+            message: err instanceof Error ? err.message : String(err),
+            aborted: isAbort,
+          },
         };
         controller.enqueue(encoder.encode(sseLine(errChunk)));
         controller.close();
@@ -68,7 +116,7 @@ export function GET(): Response {
   return new Response(
     JSON.stringify({
       error: "method_not_allowed",
-      message: "Use POST. Body: { model, messages, temperature?, maxTokens? }",
+      message: "Use POST. Body: { model, messages, temperature?, maxTokens?, tools? }",
     }),
     { status: 405, headers: { "content-type": "application/json" } },
   );

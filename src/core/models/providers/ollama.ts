@@ -1,11 +1,27 @@
-import { makeMockProvider } from "./mock-base";
-
 /**
- * Ollama provider (W2 stub)。本地 LLM 推理。
+ * Ollama provider（W3 真实，走 OpenAI 兼容模式）。
  *
- * W3+ 替换为真实 `http://localhost:11434/api/chat`：
- * - 鉴权：无（本地服务）
- * - 流式：body 加 `"stream": true`，每行 NDJSON `{message: {content: "..."}, done: false}`
- * - 注意：Ollama 的流式是 NDJSON 不是 SSE，需要在 client 端解析
+ * 启动 Ollama 时自带 OpenAI 兼容端点（>=0.1.14）：
+ * baseUrl: http://localhost:11434/v1
+ * API Key: 任意字符串（Ollama 不校验）
+ *
+ * 模型 id 形如 `ollama:llama3.1`，调用时去掉 `ollama:` 前缀。
  */
-export const ollamaProvider = makeMockProvider("ollama");
+
+import type { ModelProvider } from "../types";
+import { OpenAICompatProvider } from "./openai-compat";
+
+class OllamaProviderImpl extends OpenAICompatProvider {
+  constructor(apiKey = "ollama") {
+    super({
+      providerId: "ollama",
+      baseUrl: "http://localhost:11434/v1",
+      apiKey,
+      // 模型 id 可能带 "ollama:" 前缀（来自 registry），发请求时去掉
+      modelMap: (id) => id.replace(/^ollama:/, ""),
+    });
+  }
+}
+
+/** Ollama 默认有 stub apiKey，连接失败时由后端捕获 */
+export const ollamaProvider: ModelProvider = new OllamaProviderImpl();
