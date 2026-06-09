@@ -17,16 +17,16 @@ const labs = [
   {
     path: "/labs/codegen/tsx",
     title: "2.1.1 TSX 代码生成",
-    status: "planned",
-    desc: "LLM 生成 React TSX 代码 → iframe 沙箱执行 → 实时渲染。",
-    features: "W7 落地：core/engine/sandbox/ + babel standalone",
+    status: "done",
+    desc: "LLM 生成 React 代码 → sandbox iframe 安全执行 → 实时渲染。",
+    features: "W7 落地：core/engine/sandbox/ + postMessage 协议",
   },
   {
     path: "/labs/codegen/mixed",
     title: "2.1.3 混合（DSL + TSX）",
     status: "planned",
-    desc: "LLM 自选 DSL 或 TSX → 统一渲染管道 → 对照评估。",
-    features: "W7 落地：DSL/TSX 混合路由 + 质量评分",
+    desc: "LLM 自选 DSL 或 TSX → 统一渲染管道。",
+    features: "W8+ 落地",
   },
 ];
 
