@@ -24,9 +24,9 @@ const labs = [
   {
     path: "/labs/codegen/mixed",
     title: "2.1.3 混合（DSL + TSX）",
-    status: "planned",
-    desc: "LLM 自选 DSL 或 TSX → 统一渲染管道。",
-    features: "W8+ 落地",
+    status: "done",
+    desc: "同一 UI 的两种表达 → 统一渲染管道 → 对照评估。",
+    features: "W8 落地：DSL+TSX 并排对比 + 对照评估表",
   },
 ];
 

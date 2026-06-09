@@ -6,39 +6,75 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
-const DEMO_CODE = `// LLM 生成的 TSX 代码（在沙箱 iframe 执行）
-// 可用：React.createElement（沙箱内无 JSX 编译器，用 createElement）
+const DEMO_CODE = `// LLM 生成的 JS 代码（在 sandbox iframe 执行）
+// 直接操作 DOM 创建 UI 元素
 
-const el = React.createElement('div', { style: { padding: '16px' } },
-  React.createElement('h2', { style: { fontSize: '18px', fontWeight: 'bold', marginBottom: '8px' } }, 'GenUI Labs · Sandbox Demo'),
-  React.createElement('p', { style: { color: '#a1a1aa', fontSize: '14px', marginBottom: '12px' } }, '这段代码在 sandbox iframe 中执行。'),
-  React.createElement('button', {
-    onClick: () => alert('Hello from sandbox!'),
-    style: {
-      backgroundColor: '#3b82f6', color: 'white', border: 'none',
-      padding: '8px 16px', borderRadius: '6px', cursor: 'pointer', fontSize: '14px'
-    }
-  }, '点我'),
-  React.createElement('table', { style: { marginTop: '16px', borderCollapse: 'collapse', width: '100%' } },
-    React.createElement('thead', {},
-      React.createElement('tr', { style: { borderBottom: '1px solid #27272a' } },
-        React.createElement('th', { style: { textAlign: 'left', padding: '8px', fontSize: '12px', color: '#a1a1aa' } }, 'Week'),
-        React.createElement('th', { style: { textAlign: 'left', padding: '8px', fontSize: '12px', color: '#a1a1aa' } }, 'Status')
-      )
-    ),
-    React.createElement('tbody', {},
-      [['W1', '✅ 完成'], ['W2', '✅ 完成'], ['W6', '✅ 完成'], ['W7', '🔧 进行中']].map(([week, status]) =>
-        React.createElement('tr', { key: week, style: { borderBottom: '1px solid #18181b' } },
-          React.createElement('td', { style: { padding: '8px', fontSize: '13px' } }, week),
-          React.createElement('td', { style: { padding: '8px', fontSize: '13px' } }, status)
-        )
-      )
-    )
-  )
-);
+var h2 = document.createElement('h2');
+h2.style.fontSize = '18px';
+h2.style.fontWeight = 'bold';
+h2.style.marginBottom = '8px';
+h2.textContent = 'GenUI Labs · Sandbox Demo';
 
-// 返回根元素 → 在沙箱 body 显示
-document.getElementById('root').appendChild(el);`;
+var p = document.createElement('p');
+p.style.color = '#a1a1aa';
+p.style.fontSize = '14px';
+p.style.marginBottom = '12px';
+p.textContent = '这段代码在 sandbox iframe 中安全执行。';
+
+var btn = document.createElement('button');
+btn.textContent = '点我';
+btn.style.backgroundColor = '#3b82f6';
+btn.style.color = 'white';
+btn.style.border = 'none';
+btn.style.padding = '8px 16px';
+btn.style.borderRadius = '6px';
+btn.style.cursor = 'pointer';
+btn.style.fontSize = '14px';
+btn.onclick = function() { alert('Hello from sandbox!'); };
+
+var table = document.createElement('table');
+table.style.marginTop = '16px';
+table.style.borderCollapse = 'collapse';
+table.style.width = '100%';
+
+var thead = document.createElement('thead');
+var trHead = document.createElement('tr');
+trHead.style.borderBottom = '1px solid #27272a';
+var th1 = document.createElement('th');
+th1.style.textAlign = 'left';
+th1.style.padding = '8px';
+th1.style.fontSize = '12px';
+th1.style.color = '#a1a1aa';
+th1.textContent = 'Week';
+var th2 = th1.cloneNode();
+th2.textContent = 'Status';
+trHead.appendChild(th1);
+trHead.appendChild(th2);
+thead.appendChild(trHead);
+table.appendChild(thead);
+
+var tbody = document.createElement('tbody');
+[['W1', '✅'], ['W2', '✅'], ['W3', '✅'], ['W4', '✅'], ['W5', '✅'], ['W6', '✅'], ['W7', '✅']]
+  .forEach(function(row) {
+    var tr = document.createElement('tr');
+    tr.style.borderBottom = '1px solid #18181b';
+    var td1 = document.createElement('td');
+    td1.style.padding = '8px';
+    td1.style.fontSize = '13px';
+    td1.textContent = row[0];
+    var td2 = td1.cloneNode();
+    td2.textContent = row[1];
+    tr.appendChild(td1);
+    tr.appendChild(td2);
+    tbody.appendChild(tr);
+  });
+table.appendChild(tbody);
+
+document.getElementById('root').appendChild(h2);
+document.getElementById('root').appendChild(p);
+document.getElementById('root').appendChild(btn);
+document.getElementById('root').appendChild(table);
+`;
 
 export default function TsxPage() {
   const iframeRef = useRef<HTMLIFrameElement>(null);
@@ -111,7 +147,7 @@ export default function TsxPage() {
                   src="/sandbox-iframe"
                   title="sandbox"
                   className="h-full w-full min-h-[20rem] border-0"
-                  sandbox="allow-scripts"
+                  sandbox="allow-scripts allow-same-origin"
                 />
               </div>
             </CardContent>
