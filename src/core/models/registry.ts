@@ -1,0 +1,69 @@
+/**
+ * 静态模型注册表。
+ *
+ * W2 只内置静态清单。W3 起各 provider 可以在 listModels() 时远端拉取真实列表。
+ */
+
+import type { ModelInfo } from "./types";
+
+export const BUILTIN_MODELS: ModelInfo[] = [
+  // OpenAI
+  { id: "gpt-4o-mini", provider: "openai", label: "OpenAI · GPT-4o mini", contextWindow: 128_000 },
+  { id: "gpt-4o", provider: "openai", label: "OpenAI · GPT-4o", contextWindow: 128_000 },
+  { id: "gpt-4.1", provider: "openai", label: "OpenAI · GPT-4.1", contextWindow: 1_000_000 },
+
+  // Anthropic
+  {
+    id: "claude-sonnet-4-5",
+    provider: "anthropic",
+    label: "Anthropic · Claude Sonnet 4.5",
+    contextWindow: 200_000,
+  },
+  {
+    id: "claude-haiku-4-5",
+    provider: "anthropic",
+    label: "Anthropic · Claude Haiku 4.5",
+    contextWindow: 200_000,
+  },
+
+  // Google
+  {
+    id: "gemini-2.5-pro",
+    provider: "google",
+    label: "Google · Gemini 2.5 Pro",
+    contextWindow: 2_000_000,
+  },
+  {
+    id: "gemini-2.5-flash",
+    provider: "google",
+    label: "Google · Gemini 2.5 Flash",
+    contextWindow: 1_000_000,
+  },
+
+  // DeepSeek
+  { id: "deepseek-chat", provider: "deepseek", label: "DeepSeek · Chat", contextWindow: 64_000 },
+  {
+    id: "deepseek-reasoner",
+    provider: "deepseek",
+    label: "DeepSeek · Reasoner",
+    contextWindow: 64_000,
+  },
+
+  // Qwen（DashScope OpenAI 兼容模式）
+  { id: "qwen-max", provider: "qwen", label: "Qwen · Max", contextWindow: 128_000 },
+  { id: "qwen-plus", provider: "qwen", label: "Qwen · Plus", contextWindow: 128_000 },
+
+  // Ollama（本地）
+  { id: "ollama:llama3.1", provider: "ollama", label: "Ollama · Llama 3.1 (local)" },
+  { id: "ollama:qwen2.5", provider: "ollama", label: "Ollama · Qwen 2.5 (local)" },
+];
+
+/** 按 model id 查找 */
+export function findModel(id: string): ModelInfo | undefined {
+  return BUILTIN_MODELS.find((m) => m.id === id);
+}
+
+/** 按 provider 列出模型 */
+export function listModelsByProvider(provider: string): ModelInfo[] {
+  return BUILTIN_MODELS.filter((m) => m.provider === provider);
+}

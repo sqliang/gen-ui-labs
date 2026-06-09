@@ -3,6 +3,7 @@
 import { Bot, Code2, Eye, Radio } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useEffect, useState } from "react";
 
 import { Badge } from "@/components/ui/badge";
 import { useSessionStore } from "@/core/state/session-store";
@@ -15,9 +16,38 @@ const LAB_NAV = [
   { id: "observability", label: "Observability", icon: Bot },
 ] as const;
 
+/**
+ * 把 URL ?model=xxx / ?session=xxx / ?lab=xxx 同步进 session-store。
+ * 只在 client mount 后读取（避免 SSR 期 useSearchParams 报错）。
+ */
+function useUrlToStore(): void {
+  const setModel = useSessionStore((s) => s.setCurrentModel);
+  const setSession = useSessionStore((s) => s.setCurrentSession);
+  const setLab = useSessionStore((s) => s.setCurrentLab);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const params = new URLSearchParams(window.location.search);
+    const model = params.get("model");
+    const session = params.get("session");
+    const lab = params.get("lab");
+    if (model) setModel(model);
+    if (session) setSession(session);
+    if (lab) setLab(lab);
+  }, [setModel, setSession, setLab]);
+}
+
 export function LabSidebar() {
   const pathname = usePathname();
   const currentSessionId = useSessionStore((s) => s.currentSessionId);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  // URL → session-store 单向同步（只在 mount 后）
+  useUrlToStore();
 
   return (
     <aside className="bg-card text-card-foreground border-border flex w-56 shrink-0 flex-col border-r">
@@ -62,7 +92,7 @@ export function LabSidebar() {
         </div>
         <div className="flex items-center justify-between gap-2 text-xs">
           <span className="text-muted-foreground">当前会话</span>
-          {currentSessionId ? (
+          {mounted && currentSessionId ? (
             <Badge variant="outline" className="font-mono text-[10px]">
               {currentSessionId.slice(0, 10)}
             </Badge>

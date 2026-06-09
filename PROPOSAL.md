@@ -540,15 +540,53 @@ npm run typegen     # npx next typegen（生成 PageProps / LayoutProps 类型 h
 - `npx next build` → **Compiled in 1367ms**，12 静态页 + 5 API 路由全部成功
 - `npx next dev` → **Ready in 217ms**，所有路由返回 200，API 端点返回 stub JSON
 
-### 10.4 W1 → W2 衔接（下一步）
+### 10.4 W1 → W2 衔接（已完成 ✅）
 
-按 PROPOSAL.md §4 节奏，**W2 目标**：
+按 PROPOSAL.md §4 节奏，**W2 目标已全部完成**：
 
-1. `core/models/` 落地：实现 `ModelProvider` 接口 + 6 个 provider stub（OpenAI / Anthropic / Google / DeepSeek / Qwen / Ollama）
-2. `infra/http/` 落地：SSE 客户端封装（`fetch + ReadableStream`）
-3. `app/api/chat/route.ts` 真正实现：把前端 `simulateStream` 替换为真实 LLM 流
-4. `app/(labs)/streaming/markdown/page.tsx` 接入 `/api/chat`，从 SSE 推送改为真实流
-5. `core/state/session-store.ts` 接入 URL `searchParams`（`?model=gpt-4o&lab=streaming`）
+1. ✅ `core/models/`：实现 `ModelProvider` 接口 + 6 个 provider（OpenAI / Anthropic / Google / DeepSeek / Qwen / Ollama）
+2. ✅ `infra/http/`：SSE 客户端封装（`fetchSse` / `parseSseResponse` / `parseSseEvent`）
+3. ✅ `app/api/chat/route.ts` 真正实现：调用 `provider.stream()` + SSE 输出
+4. ✅ `app/(labs)/streaming/markdown/page.tsx` 接入 `/api/chat`，保留「mock / api」双 source 对照
+5. ✅ `core/state/session-store.ts` 接入 URL searchParams（`?model=xxx`），topbar 切换时 `history.replaceState` 同步 URL
+
+**W2 新增能力**：
+
+- `core/models/types.ts`：`ChatRequest` / `ChatResponse` / `StreamChunk` / `ModelInfo` / `ModelProvider` / `ModelProviderError`
+- `core/models/registry.ts`：12+ 个内置模型清单，覆盖 6 个 provider
+- `core/models/router.ts`：`getModelProvider(modelId)` factory + `BUILTIN_PROVIDERS` 注册表
+- `core/models/providers/{openai,anthropic,google,deepseek,qwen,ollama}.ts`：6 个 stub provider（每个文件注释里说明 W3+ 真实 HTTP 接入点）
+- `core/models/providers/mock-base.ts`：W2 阶段所有 provider 共用的 mock 流式引擎（200ms 首 token 延迟 + 30ms chunk 间隔）
+- `infra/http/sse-client.ts`：`fetchSse` / `parseSseResponse` / `parseSseEvent` / `postJson`，支持 AbortSignal
+- `views/sync-search-params.tsx`：URL ↔ session-store 单向同步 hook（mount 后生效，规避 Next.js 16 useSearchParams 的 CSR bailout）
+- shadcn/ui 新增：`DropdownMenu`（按 provider 分组的模型选择器）
+- AGENTS.md 重写：Next.js 16 breaking 清单 + 项目特定规则
+
+**W2 测试覆盖（28 → 50 用例）**：
+
+- `core/models.test.ts`：13 用例（registry / router / mock 流式 / generate / abort 中断）
+- `infra/sse-client.test.ts`：9 用例（单事件 / 多事件 / event+id / 多行 data / 注释 / 跨 chunk / 非 200 报错 / POST body+headers / abort）
+- `state/*.test.ts`：沿用 W1 polish，28 用例
+- 总计 **50/50 passed**
+
+**W2 阶段验证**：
+
+- `npx tsc --noEmit` → **0 errors**
+- `npx biome check .` → **0 errors**（62 files）
+- `npx vitest run` → **50/50 passed**
+- `npx next build` → **12 静态页 + 5 API 路由**，编译 1880ms
+- `npx next dev` → Ready in **154ms**
+- `curl /api/chat`（POST）→ SSE 流式响应（mock 数据）
+- `curl /api/chat`（GET）→ 405 method_not_allowed + JSON 提示
+
+**W2 → W3 衔接（下一步）**：
+
+按 PROPOSAL.md §4 节奏，**W3 目标**：
+
+1. W3-1：安装并接入 `react-markdown@10.1.0` + `remark-gfm@4.0.1`，把 1.1.1 Markdown 流式渲染从纯文本升级成真正渲染的 Markdown
+2. W3-2：W3-3：用一个**真实 provider** 跑通（建议先 OpenAI / DeepSeek，两者 OpenAI 兼容），其他保留 mock；把 mock 改成 env-controlled（`OPENAI_API_KEY` 存在就用真，没有就 mock）
+3. W3-4：加 `app/(labs)/streaming/markdown/page.tsx` 的"实时 token 计数"显示（用 observability-store）
+4. W3-5：URL `?model=xxx&protocol=markdown` 协议切换占位
 
 ---
 

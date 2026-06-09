@@ -18,8 +18,8 @@ import { BUILTIN_MODELS, useSessionStore } from "@/core/state/session-store";
 /**
  * Lab 顶部模型选择条。
  *
- * 当前选中模型来自 useSessionStore；切换时只更新本地状态。
- * W2-7 之后会同步到 URL ?model=xxx。
+ * - 选中项同步到 session-store（也写到 URL ?model=xxx，方便分享/前进后退）
+ * - URL 是 source of truth；store 只是缓存
  */
 export function LabTopbar() {
   const currentModelId = useSessionStore((s) => s.currentModelId);
@@ -35,6 +35,14 @@ export function LabTopbar() {
     grouped[m.provider] = bucket;
   }
 
+  const handleModelChange = (id: string) => {
+    setCurrentModel(id);
+    // 用 history.replaceState 避免触发导航/suspense
+    const url = new URL(window.location.href);
+    url.searchParams.set("model", id);
+    window.history.replaceState(null, "", url.toString());
+  };
+
   return (
     <header className="bg-card text-card-foreground border-border flex h-12 shrink-0 items-center justify-between border-b px-4">
       <DropdownMenu>
@@ -48,7 +56,7 @@ export function LabTopbar() {
         <DropdownMenuContent align="start" className="w-72">
           <DropdownMenuLabel>选择模型</DropdownMenuLabel>
           <DropdownMenuSeparator />
-          <DropdownMenuRadioGroup value={currentModelId} onValueChange={(v) => setCurrentModel(v)}>
+          <DropdownMenuRadioGroup value={currentModelId} onValueChange={handleModelChange}>
             {Object.entries(grouped).map(([provider, models]) => (
               <div key={provider}>
                 <DropdownMenuLabel className="text-foreground/70 pt-2 text-[10px]">
@@ -75,7 +83,7 @@ export function LabTopbar() {
           Agent pattern: <span className="text-foreground">ReAct</span>
         </span>
         <span className="text-muted-foreground hidden md:inline">
-          <span className="text-foreground font-mono">v0.2</span> · W1 polish
+          <span className="text-foreground font-mono">v0.3</span> · W2 SSE
         </span>
       </div>
     </header>
