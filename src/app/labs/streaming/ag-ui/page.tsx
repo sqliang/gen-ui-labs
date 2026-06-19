@@ -185,7 +185,6 @@ function TimelineRow({
 }: TimelineRowProps) {
   const meta = AGUI_EVENT_TYPES.find((t) => t.type === eventType);
   const palette = paletteFor(meta?.color ?? "sky");
-  const [expanded, setExpanded] = useState(false);
 
   return (
     <div className="relative pl-8">
@@ -206,7 +205,6 @@ function TimelineRow({
         onClick={onSelect}
         className={cn(
           "hover:bg-muted/60 group w-full rounded-md border border-transparent px-2 py-1.5 text-left transition-all",
-          expanded && "border-border bg-muted/30",
           isAnchored && "ring-2 ring-primary/60 border-primary/40 bg-primary/5",
         )}
         data-event-index={index}
@@ -226,19 +224,12 @@ function TimelineRow({
           </span>
         </div>
         <div className="text-foreground/90 mt-0.5 text-xs">{summary}</div>
-        <div className="mt-1 flex items-center gap-2">
-          <button
-            type="button"
-            onClick={() => setExpanded((v) => !v)}
-            className="text-muted-foreground hover:text-foreground text-[10px] underline-offset-2 hover:underline"
-          >
-            {expanded ? "收起 JSON" : "展开 JSON"}
-          </button>
-          {isAnchored ? (
-            <span className="text-primary font-mono text-[9px]">📍 已锚定 → 右侧高亮</span>
-          ) : null}
-        </div>
-        {expanded ? (
+        {isAnchored ? (
+          <span className="text-primary mt-1 inline-block font-mono text-[9px]">
+            📍 已锚定 → 右侧高亮
+          </span>
+        ) : null}
+        {isAnchored ? (
           <pre className="bg-card text-muted-foreground mt-2 max-h-40 overflow-auto rounded p-2 font-mono text-[10px] leading-relaxed">
             {JSON.stringify(payload, null, 2)}
           </pre>
