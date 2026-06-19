@@ -49,12 +49,18 @@ const MOCK_EVENTS: AguiEvent[] = [
   { type: "RUN_FINISHED", threadId: "thread_001", runId: "run_001" },
 ];
 
+/** 事件间隔（ms）—— 给点节奏感，让浏览器能看到逐事件到达 */
+const TICK_MS = 200;
+
 export async function POST(_request: Request): Promise<Response> {
   const stream = new ReadableStream<Uint8Array>({
-    start(controller) {
+    async start(controller) {
       const encoder = new TextEncoder();
       for (const event of MOCK_EVENTS) {
         controller.enqueue(encoder.encode(sseLine(event)));
+        // 间隔：用 setTimeout + Promise 让出事件循环，
+        // 中断靠 client 断开连接（read() 返回 done）
+        await new Promise<void>((resolve) => setTimeout(resolve, TICK_MS));
       }
       controller.close();
     },
