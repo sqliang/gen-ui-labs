@@ -7,9 +7,11 @@ import {
   CornerDownRight,
   Cpu,
   Loader2,
+  MapPin,
   Play,
   Square,
   Wrench,
+  X,
   XCircle,
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -22,6 +24,7 @@ import {
   type AguiEvent,
   type AguiStateDelta,
   type AguiStateSnapshot,
+  type AguiTextMessageContent,
   type AguiToolCallArgs,
   type AguiToolCallEnd,
   type AguiToolCallStart,
@@ -166,6 +169,8 @@ interface TimelineRowProps {
   summary: string;
   payload: unknown;
   isLatest: boolean;
+  isAnchored: boolean;
+  onSelect: () => void;
 }
 
 function TimelineRow({
@@ -175,6 +180,8 @@ function TimelineRow({
   summary,
   payload,
   isLatest,
+  isAnchored,
+  onSelect,
 }: TimelineRowProps) {
   const meta = AGUI_EVENT_TYPES.find((t) => t.type === eventType);
   const palette = paletteFor(meta?.color ?? "sky");
@@ -196,11 +203,13 @@ function TimelineRow({
       />
       <button
         type="button"
-        onClick={() => setExpanded((v) => !v)}
+        onClick={onSelect}
         className={cn(
-          "hover:bg-muted/60 group w-full rounded-md border border-transparent px-2 py-1.5 text-left transition-colors",
+          "hover:bg-muted/60 group w-full rounded-md border border-transparent px-2 py-1.5 text-left transition-all",
           expanded && "border-border bg-muted/30",
+          isAnchored && "ring-2 ring-primary/60 border-primary/40 bg-primary/5",
         )}
+        data-event-index={index}
       >
         <div className="flex items-center gap-2">
           <span className="text-muted-foreground font-mono text-[10px] tabular-nums">
@@ -217,6 +226,18 @@ function TimelineRow({
           </span>
         </div>
         <div className="text-foreground/90 mt-0.5 text-xs">{summary}</div>
+        <div className="mt-1 flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setExpanded((v) => !v)}
+            className="text-muted-foreground hover:text-foreground text-[10px] underline-offset-2 hover:underline"
+          >
+            {expanded ? "收起 JSON" : "展开 JSON"}
+          </button>
+          {isAnchored ? (
+            <span className="text-primary font-mono text-[9px]">📍 已锚定 → 右侧高亮</span>
+          ) : null}
+        </div>
         {expanded ? (
           <pre className="bg-card text-muted-foreground mt-2 max-h-40 overflow-auto rounded p-2 font-mono text-[10px] leading-relaxed">
             {JSON.stringify(payload, null, 2)}
@@ -269,9 +290,24 @@ interface ToolCallState {
   status: "calling" | "args-done" | "ended";
 }
 
-function ToolCallCard({ call }: { call: ToolCallState }) {
+function ToolCallCard({
+  call,
+  isAnchored,
+  onSelect,
+}: {
+  call: ToolCallState;
+  isAnchored: boolean;
+  onSelect: () => void;
+}) {
   return (
-    <div className="border-amber-500/40 bg-amber-500/5 rounded-lg border p-3 text-xs">
+    <button
+      type="button"
+      className={cn(
+        "border-amber-500/40 bg-amber-500/5 focus-visible:ring-ring relative w-full cursor-pointer rounded-lg border p-3 text-left text-xs transition-all focus-visible:ring-2 focus-visible:outline-none",
+        isAnchored && "ring-2 ring-primary/60 border-primary bg-primary/[0.08]",
+      )}
+      onClick={onSelect}
+    >
       <div className="flex items-center gap-2">
         <Wrench className="text-amber-600 dark:text-amber-400 size-3.5" />
         <span className="font-mono text-amber-700 dark:text-amber-300 font-semibold">
@@ -310,14 +346,32 @@ function ToolCallCard({ call }: { call: ToolCallState }) {
       ) : (
         <p className="text-muted-foreground mt-2 text-[10px] italic">（args 还没到位…）</p>
       )}
-    </div>
+    </button>
   );
 }
 
-function StateBanner({ snapshot }: { snapshot: Record<string, unknown> | null }) {
+function StateBanner({
+  id,
+  snapshot,
+  isAnchored,
+  onSelect,
+}: {
+  id?: string;
+  snapshot: Record<string, unknown> | null;
+  isAnchored: boolean;
+  onSelect: () => void;
+}) {
   if (!snapshot) return null;
   return (
-    <div className="border-violet-500/40 bg-violet-500/5 rounded-lg border p-3 text-xs">
+    <button
+      type="button"
+      id={id}
+      className={cn(
+        "border-violet-500/40 bg-violet-500/5 focus-visible:ring-ring relative w-full cursor-pointer rounded-lg border p-3 text-left text-xs transition-all focus-visible:ring-2 focus-visible:outline-none",
+        isAnchored && "ring-2 ring-primary/60 border-primary bg-primary/[0.08]",
+      )}
+      onClick={onSelect}
+    >
       <div className="flex items-center gap-2">
         <Cpu className="text-violet-600 dark:text-violet-400 size-3.5" />
         <span className="font-mono text-violet-700 dark:text-violet-300 font-semibold">
@@ -330,7 +384,7 @@ function StateBanner({ snapshot }: { snapshot: Record<string, unknown> | null })
       <pre className="bg-card/60 text-muted-foreground mt-2 max-h-24 overflow-auto rounded p-1.5 font-mono text-[10px]">
         {JSON.stringify(snapshot, null, 2)}
       </pre>
-    </div>
+    </button>
   );
 }
 
@@ -347,6 +401,14 @@ export default function AguiPage() {
   // 工具调用状态机：根据事件流派生
   const [toolCalls, setToolCalls] = useState<Record<string, ToolCallState>>({});
   const [stateSnapshot, setStateSnapshot] = useState<Record<string, unknown> | null>(null);
+
+  // 文本片段：每个 TEXT_MESSAGE_CONTENT 单独保留，方便逐段锚定
+  const [textSegments, setTextSegments] = useState<
+    { eventIndex: number; messageId: string; text: string }[]
+  >([]);
+
+  // 锚定状态：哪个原始事件被高亮 → 对应渲染元素的 DOM id
+  const [anchoredEventIndex, setAnchoredEventIndex] = useState<number | null>(null);
 
   // 事件时间戳（相对首个事件的 ms）
   const startTimeRef = useRef<number | null>(null);
@@ -393,6 +455,49 @@ export default function AguiPage() {
     if (chunks.some((c) => c.kind === "control" && c.type === "end")) return "done";
     return "idle";
   }, [isStreaming, errorMsg, chunks]);
+
+  // 计算 event[i] 对应右栏渲染产物的 DOM id
+  function targetIdForEvent(event: AguiEvent, _index: number): string | null {
+    switch (event.type) {
+      case "TEXT_MESSAGE_CONTENT":
+        return `text-seg-${_index}`;
+      case "TOOL_CALL_START":
+      case "TOOL_CALL_ARGS":
+      case "TOOL_CALL_END":
+        return `tool-${event.toolCallId}`;
+      case "STATE_SNAPSHOT":
+      case "STATE_DELTA":
+        return "state-banner";
+      case "RUN_STARTED":
+      case "RUN_FINISHED":
+      case "RUN_ERROR":
+        return "render-progress";
+    }
+  }
+
+  // 锚定某个事件：滚动到右栏对应 DOM + 高亮
+  const handleAnchor = (eventIndex: number) => {
+    if (eventIndex < 0 || eventIndex >= rawEvents.length) return;
+    const event = rawEvents[eventIndex];
+    if (!event) return;
+    // 再次点同一行 → 取消锚定
+    if (anchoredEventIndex === eventIndex) {
+      setAnchoredEventIndex(null);
+      return;
+    }
+    setAnchoredEventIndex(eventIndex);
+    const targetId = targetIdForEvent(event, eventIndex);
+    if (!targetId) return;
+    // 等 React 提交完高亮 class 再滚动
+    requestAnimationFrame(() => {
+      const el = document.getElementById(targetId);
+      if (el) {
+        el.scrollIntoView({ behavior: "smooth", block: "center" });
+      }
+    });
+  };
+
+  const handleClearAnchor = () => setAnchoredEventIndex(null);
 
   // 工具调用状态机 reducer
   const updateToolCalls = (event: AguiEvent) => {
@@ -442,6 +547,8 @@ export default function AguiPage() {
     setRawEvents([]);
     setToolCalls({});
     setStateSnapshot(null);
+    setTextSegments([]);
+    setAnchoredEventIndex(null);
     startTimeRef.current = performance.now();
     setNow(0);
 
@@ -453,7 +560,18 @@ export default function AguiPage() {
         } catch {
           continue;
         }
-        setRawEvents((prev) => [...prev, agui]);
+        // 拿到 index 再 append：setRawEvents 回调里取最新长度
+        setRawEvents((prev) => {
+          const idx = prev.length;
+          if (agui.type === "TEXT_MESSAGE_CONTENT") {
+            const t = agui as AguiTextMessageContent;
+            setTextSegments((segs) => [
+              ...segs,
+              { eventIndex: idx, messageId: t.messageId, text: t.delta },
+            ]);
+          }
+          return [...prev, agui];
+        });
         updateToolCalls(agui);
 
         const re = aguiAdapter.adapt(agui);
@@ -475,10 +593,19 @@ export default function AguiPage() {
     setRawEvents([]);
     setToolCalls({});
     setStateSnapshot(null);
+    setTextSegments([]);
+    setAnchoredEventIndex(null);
     setErrorMsg(null);
     startTimeRef.current = null;
     setNow(0);
   };
+
+  // 当前锚定事件的可读描述
+  const anchoredEvent = anchoredEventIndex !== null ? rawEvents[anchoredEventIndex] : null;
+  const anchoredSummary =
+    anchoredEvent && anchoredEventIndex !== null
+      ? `#${String(anchoredEventIndex + 1).padStart(2, "0")} ${anchoredEvent.type} · ${summarizeEvent(anchoredEvent, anchoredEventIndex)}`
+      : null;
 
   return (
     <div className="mx-auto w-full max-w-7xl px-6 py-8">
@@ -628,6 +755,8 @@ export default function AguiPage() {
                         summary={summarizeEvent(evt, i)}
                         payload={evt}
                         isLatest={i === rawEvents.length - 1}
+                        isAnchored={anchoredEventIndex === i}
+                        onSelect={() => handleAnchor(i)}
                       />
                     </div>
                   );
@@ -652,34 +781,104 @@ export default function AguiPage() {
               <EmptyHint>点击「开始」观察右栏实时填充。</EmptyHint>
             ) : (
               <div className="space-y-3">
-                {/* 文本内容 */}
-                {accumulatedText ? (
+                {/* 锚定提示 banner */}
+                {anchoredSummary ? (
+                  <div className="border-primary/40 bg-primary/10 text-primary flex items-center gap-2 rounded-md border px-2.5 py-1.5 text-[10.5px] font-mono">
+                    <MapPin className="size-3 shrink-0" />
+                    <span className="truncate">📍 锚定到 {anchoredSummary}</span>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="ghost"
+                      onClick={handleClearAnchor}
+                      className="hover:text-foreground ml-auto h-5 px-1 text-[10px]"
+                    >
+                      <X className="size-3" /> 解除
+                    </Button>
+                  </div>
+                ) : null}
+
+                {/* 文本内容 — 逐段（每个 TEXT_MESSAGE_CONTENT 一段），方便逐段锚定 */}
+                {textSegments.length > 0 ? (
                   <div className="border-border bg-card rounded-lg border p-3">
                     <div className="text-muted-foreground mb-1.5 flex items-center gap-1.5 text-[10px] font-mono">
                       <CornerDownRight className="size-3" />
-                      TextChunk · {accumulatedText.length} chars
+                      TextChunk · {accumulatedText.length} chars · {textSegments.length} 段
                       {isStreaming ? (
                         <span className="bg-primary ml-1 inline-block h-3 w-1.5 animate-pulse" />
                       ) : null}
                     </div>
-                    <p className="text-foreground/90 whitespace-pre-wrap text-xs leading-relaxed">
-                      {accumulatedText}
-                    </p>
+                    <div className="space-y-1">
+                      {textSegments.map((seg) => {
+                        const anchored = anchoredEventIndex === seg.eventIndex;
+                        return (
+                          <button
+                            type="button"
+                            key={seg.eventIndex}
+                            id={`text-seg-${seg.eventIndex}`}
+                            onClick={() => handleAnchor(seg.eventIndex)}
+                            className={cn(
+                              "text-foreground/90 hover:bg-muted/40 focus-visible:ring-ring block w-full cursor-pointer rounded px-1.5 py-0.5 text-left text-xs leading-relaxed transition-colors focus-visible:ring-2 focus-visible:outline-none",
+                              anchored && "bg-primary/15 ring-2 ring-primary/60",
+                            )}
+                          >
+                            {seg.text}
+                          </button>
+                        );
+                      })}
+                    </div>
                   </div>
                 ) : null}
 
                 {/* 工具调用卡片 */}
-                {Object.values(toolCalls).map((c) => (
-                  <ToolCallCard key={c.id} call={c} />
-                ))}
+                {Object.values(toolCalls).map((c) => {
+                  // 当前 tool 卡的锚定：找原始事件里 type 属于 tool_* 且 toolCallId 匹配，且 index == anchoredEventIndex
+                  const anchored =
+                    anchoredEventIndex !== null &&
+                    rawEvents[anchoredEventIndex]?.type.startsWith("TOOL_CALL_") === true &&
+                    (rawEvents[anchoredEventIndex] as { toolCallId?: string })?.toolCallId === c.id;
+                  return (
+                    <div key={c.id} id={`tool-${c.id}`}>
+                      <ToolCallCard
+                        call={c}
+                        isAnchored={anchored}
+                        onSelect={() => {
+                          // 锚定到该 tool 卡的第一个事件（START）
+                          const startIdx = rawEvents.findIndex(
+                            (e) =>
+                              e.type === "TOOL_CALL_START" &&
+                              (e as AguiToolCallStart).toolCallId === c.id,
+                          );
+                          if (startIdx >= 0) handleAnchor(startIdx);
+                        }}
+                      />
+                    </div>
+                  );
+                })}
 
-                {/* 状态快照 */}
-                {stateSnapshot ? <StateBanner snapshot={stateSnapshot} /> : null}
+                {/* 状态快照 — id 挂在 button 上以支持 scrollIntoView */}
+                {stateSnapshot ? (
+                  <StateBanner
+                    id="state-banner"
+                    snapshot={stateSnapshot}
+                    isAnchored={
+                      anchoredEventIndex !== null &&
+                      (rawEvents[anchoredEventIndex]?.type === "STATE_SNAPSHOT" ||
+                        rawEvents[anchoredEventIndex]?.type === "STATE_DELTA")
+                    }
+                    onSelect={() => {
+                      const idx = rawEvents.findIndex(
+                        (e) => e.type === "STATE_SNAPSHOT" || e.type === "STATE_DELTA",
+                      );
+                      if (idx >= 0) handleAnchor(idx);
+                    }}
+                  />
+                ) : null}
 
                 <Separator />
 
-                {/* 流式进度 */}
-                <div className="space-y-2">
+                {/* 流式进度（控制类事件锚到这里） */}
+                <div id="render-progress" className="space-y-2">
                   <div className="text-muted-foreground text-[10px] font-mono">
                     Event kinds · {chunks.length} total
                   </div>
