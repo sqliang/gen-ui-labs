@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 
 /**
  * Hero 右侧的 live token stream —— 模拟"协议事件流 + 文本同步生成"。
@@ -28,21 +28,15 @@ const EVENTS = [
 
 export function LiveTokenStream() {
   const [tick, setTick] = useState(0);
-  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
-    const step = () => {
-      setTick((t) => {
-        const next = (t + 1) % EVENTS.length;
-        const dur = (EVENTS[next]?.t ?? 0) - (EVENTS[t]?.t ?? 0);
-        timer.current = setTimeout(step, Math.max(120, dur));
-        return next;
-      });
-    };
-    timer.current = setTimeout(step, 600);
-    return () => {
-      if (timer.current) clearTimeout(timer.current);
-    };
+    // 固定 180ms 一帧：覆盖 EVENTS 里的最大间隔（2500ms / 16 events ≈ 156ms）。
+    // 用 setInterval 而不是嵌套 setTimeout —— 避免 dev StrictMode 下
+    // 多 timer 叠加导致的"跳帧 / 闪烁"。
+    const id = setInterval(() => {
+      setTick((t) => (t + 1) % EVENTS.length);
+    }, 180);
+    return () => clearInterval(id);
   }, []);
 
   const visible = EVENTS.slice(0, tick + 1);

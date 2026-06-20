@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 
-import { LabSidebar } from "@/components/lab-sidebar";
 import { SiteHeader } from "@/components/site-header";
 import { ThemeApplier } from "@/components/theme-applier";
 
@@ -37,13 +36,10 @@ export default function RootLayout({
     >
       <body className="dark bg-background text-foreground min-h-full">
         <ThemeApplier />
-        {/* 桌面：顶栏 + 侧栏 + 内容；移动：只顶栏 + 横向 chip 在 LabSidebar 里渲染 */}
+        {/* 全站顶栏；侧栏只在 /labs/* 下由 labs/layout.tsx 渲染 */}
         <div className="flex min-h-screen flex-col">
           <SiteHeader />
-          <div className="flex flex-1">
-            <LabSidebar />
-            <div className="min-w-0 flex-1">{children}</div>
-          </div>
+          <div className="min-w-0 flex-1">{children}</div>
         </div>
       </body>
     </html>

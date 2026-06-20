@@ -15,24 +15,26 @@ import type { LabDefinition } from "@/core/labs";
  * - 左上角是 Lab 编号 + 标题 + 协议标识（看起来像"工具卡"）
  * - 中间是 feature 列表（3-4 条要点）
  * - 底部是 mini-demo 区（独立的"窗口"感）
- * - 整张卡可点 → 进入 Lab；右上角 arrow 是装饰暗示
+ *
+ * 实现要点：
+ * - 外层是 <div>，里面用绝对定位的 <Link> 覆盖整张卡做"整卡可点"。
+ * - mini-demo 区用 relative + z-index 浮在 Link 之上，独立接管事件。
+ *   这样可以避免 <button> / <a> 嵌套导致 HTML 无效（之前整个 Link 被拆掉，点击失活）。
  */
 export function LabCard({ lab }: { lab: LabDefinition }) {
   const Icon = lab.icon;
   return (
-    <Link
-      href={lab.href}
+    <div
       className="group bg-card/40 hover:bg-card/70 relative flex flex-col overflow-hidden rounded-xl border border-white/[0.06] backdrop-blur-sm transition-all duration-300 hover:-translate-y-0.5 hover:border-white/10"
       style={
         {
-          // CSS custom properties 供子组件用
           "--lab-accent": lab.accent.solid,
           "--lab-accent-soft": lab.accent.soft,
           "--lab-accent-glow": lab.accent.glow,
         } as React.CSSProperties
       }
     >
-      {/* hover 时浮起的 accent glow */}
+      {/* hover 时浮起的 accent glow —— 装饰层，不能拦截点击 */}
       <div
         aria-hidden
         className="pointer-events-none absolute -inset-px rounded-xl opacity-0 transition-opacity duration-500 group-hover:opacity-100"
@@ -96,9 +98,9 @@ export function LabCard({ lab }: { lab: LabDefinition }) {
         ))}
       </ul>
 
-      {/* mini-demo 区 —— 模拟"这个 Lab 在跑" */}
+      {/* mini-demo 区 —— 浮在 Link 之上，独立接管事件（防止 button 嵌套 a 的 HTML 冲突） */}
       <div
-        className="relative mt-5 mx-5 mb-5 overflow-hidden rounded-lg border bg-black/30 p-3"
+        className="relative z-10 mt-5 mx-5 mb-5 overflow-hidden rounded-lg border bg-black/30 p-3"
         style={{ borderColor: `${lab.accent.solid}22` }}
       >
         {/* 模拟窗口 chrome */}
@@ -118,7 +120,18 @@ export function LabCard({ lab }: { lab: LabDefinition }) {
         </div>
         <LabMiniDemo id={lab.miniDemo} />
       </div>
-    </Link>
+
+      {/* 整卡可点的 anchor —— absolute 覆盖整张卡，位于 mini-demo 之下。
+          这保证：点击标题/描述/features 都跳转到 Lab，点击 mini-demo 内部按钮不跳转。 */}
+      <Link
+        href={lab.href}
+        aria-label={`进入 ${lab.title}`}
+        className="absolute inset-0 z-0 rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+        style={{ "--tw-ring-color": lab.accent.solid } as React.CSSProperties}
+      >
+        <span className="sr-only">进入 {lab.title}</span>
+      </Link>
+    </div>
   );
 }
 

@@ -5,7 +5,7 @@ import { useEffect, useState } from "react";
 /**
  * Lab 3 · Workbench 的 mini-demo。
  *
- * 三栏：左 DSL / 中 events / 右 rendered。点击左栏某一行，对应右栏高亮。
+ * 三栏：左 DSL / 中 events / 右 rendered。鼠标悬停左栏某一行，对应右栏高亮。
  * 不做真实节点 inspector，只演示"反向高亮"概念。
  */
 const LINES = [
