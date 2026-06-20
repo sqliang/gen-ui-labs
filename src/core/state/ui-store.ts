@@ -27,7 +27,9 @@ interface UiState {
 export const useUiStore = create<UiState>()(
   persist(
     (set) => ({
-      themeMode: "system",
+      // 站点是 devtool 风格：默认 dark（不跟随系统）。
+      // 用户点 sun icon 切换到 light，会持久化。
+      themeMode: "dark",
       commandOpen: false,
       sidebarWidth: 280,
 
@@ -35,7 +37,7 @@ export const useUiStore = create<UiState>()(
       toggleCommand: () => set((s) => ({ commandOpen: !s.commandOpen })),
       setCommandOpen: (commandOpen) => set({ commandOpen }),
       setSidebarWidth: (sidebarWidth) => set({ sidebarWidth }),
-      reset: () => set({ themeMode: "system", commandOpen: false, sidebarWidth: 280 }),
+      reset: () => set({ themeMode: "dark", commandOpen: false, sidebarWidth: 280 }),
     }),
     {
       name: "gen-ui-labs.ui",

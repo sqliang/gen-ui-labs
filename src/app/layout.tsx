@@ -34,9 +34,8 @@ export default function RootLayout({
       lang="zh-CN"
       suppressHydrationWarning
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
-      style={{ colorScheme: "dark" }}
     >
-      <body className="dark bg-background text-foreground min-h-full">
+      <body className="bg-background text-foreground min-h-full">
         <ThemeApplier />
         {/* 全站顶栏；侧栏只在 /labs/* 下由 labs/layout.tsx 渲染 */}
         <div className="flex min-h-screen flex-col">

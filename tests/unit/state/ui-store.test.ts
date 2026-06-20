@@ -9,7 +9,7 @@ describe("ui-store", () => {
 
   it("默认状态正确", () => {
     const state = useUiStore.getState();
-    expect(state.themeMode).toBe("system");
+    expect(state.themeMode).toBe("dark");
     expect(state.commandOpen).toBe(false);
     expect(state.sidebarWidth).toBe(280);
   });

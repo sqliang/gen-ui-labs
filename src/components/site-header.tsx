@@ -155,49 +155,31 @@ function ModelSwitcher() {
 }
 
 function ThemeSwitcher() {
-  // 我们强制 dark（devtool 站不跟随系统），但保留 light 切换兜底
-  // 让用户在浅色环境（截图、文档演示）下能用
-  const [mode, setMode] = useState<"dark" | "light">("dark");
+  const themeMode = useUiStore((s) => s.themeMode);
+  const setTheme = useUiStore((s) => s.setTheme);
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
     setMounted(true);
-    const stored = localStorage.getItem("gen-ui-labs.ui");
-    if (stored) {
-      try {
-        const parsed = JSON.parse(stored) as { state?: { themeMode?: string } };
-        const m = parsed.state?.themeMode;
-        if (m === "light" || m === "dark") setMode(m);
-      } catch {
-        // ignore
-      }
-    }
   }, []);
 
-  const handle = (next: "dark" | "light") => {
-    setMode(next);
-    if (typeof document !== "undefined") {
-      document.documentElement.classList.toggle("dark", next === "dark");
-      document.documentElement.style.colorScheme = next;
-    }
-    // 同步到 localStorage（按 ui-store 的 persist key 写入）
-    try {
-      const stored = localStorage.getItem("gen-ui-labs.ui");
-      const parsed = stored ? JSON.parse(stored) : { state: {}, version: 0 };
-      parsed.state = { ...parsed.state, themeMode: next };
-      localStorage.setItem("gen-ui-labs.ui", JSON.stringify(parsed));
-    } catch {
-      // ignore
-    }
-  };
+  // mount 前默认 dark（避免 hydration mismatch）
+  const isDark = mounted
+    ? themeMode === "dark" ||
+      (themeMode === "system" &&
+        typeof window !== "undefined" &&
+        window.matchMedia("(prefers-color-scheme: dark)").matches)
+    : true;
 
-  // 避免 hydration mismatch：mount 前只显示一个固定 icon
-  const isDark = mounted ? mode === "dark" : true;
+  const handle = () => {
+    // 简化：dark ↔ light 切换（system 太复杂，先隐藏）
+    setTheme(isDark ? "light" : "dark");
+  };
 
   return (
     <button
       type="button"
-      onClick={() => handle(isDark ? "light" : "dark")}
+      onClick={handle}
       className="hover:bg-muted/60 flex size-7 items-center justify-center rounded-md transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
       aria-label={isDark ? "切换到浅色" : "切换到深色"}
       title={isDark ? "切换到浅色" : "切换到深色"}
