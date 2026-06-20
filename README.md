@@ -1,119 +1,139 @@
 # GenUI Labs
 
-> 一个面向**生成式 UI（Generative UI）** 的实验性工作台：UI 协议流式渲染、LLM 生成 UI 代码/DSL、渲染引擎调试、Agent 可观测。
+> **一个面向 GenUI 的实验性工作台**。4 个 Lab 并列：UI 协议流式、代码/DSL 生成、引擎调试、Agent 可观测。共享 1 个 Core、1 个 RenderableEvent 中间表示、1 个 streaming-store。
 
-详细方案见 [`PROPOSAL.md`](./PROPOSAL.md)。
+![status](https://img.shields.io/badge/status-w4-blueviolet)
+![tests](https://img.shields.io/badge/tests-68%20passing-brightgreen)
+![stack](https://img.shields.io/badge/stack-Next.js%2016%20%C2%B7%20React%2019%20%C2%B7%20TS%205.9-blue)
 
-## 当前状态
+## 🧪 4 Labs
 
-**W1 脚手架 ✅ 完成**（2026-06-09）。`npm run dev` / `build` / `typecheck` / `lint` / `test` 全部通过。
+| # | Lab | 子页 | 节奏 | 入口 |
+|---|---|---|---|---|
+| 01 | **Streaming UI Protocols** | 4 子页（1.1.1 MD · 1.1.2 AG-UI · 1.1.3 A2UI · 1.1.4 compare） | W3-W5 | [/labs/streaming](http://localhost:3000/labs/streaming) |
+| 02 | **Generate UI Code & DSL** | 3 子页（2.1.1 TSX · 2.1.2 JSON-UI · 2.1.3 mixed） | W6-W8 | [/labs/codegen](http://localhost:3000/labs/codegen) |
+| 03 | **Engine Debug Workbench** | 4 子页（3.1.1 三栏 · 3.1.2 Inspector · 3.1.3 热力图 · 3.1.4 Replay） | W9-W11 | [/labs/workbench](http://localhost:3000/labs/workbench) |
+| 04 | **Agent Observability** | 4 子页（4.1.1 Token · 4.1.2 工具 · 4.1.3 推理 · 4.1.4 评分） | W11-W12 | [/labs/observability](http://localhost:3000/labs/observability) |
 
-## 技术栈
-
-| 层 | 选型 | 版本 |
-| --- | --- | --- |
-| 框架 | Next.js (App Router + Turbopack) | 16.2.7 |
-| UI 库 | React | 19.2.4 |
-| 语言 | TypeScript（strict + noUncheckedIndexedAccess） | 5.9.3 |
-| 样式 | Tailwind CSS v4（CSS-first config）+ shadcn/ui (zinc) | 4.3.0 |
-| 状态 | Zustand（仅承担"跨组件 + 高频 + 不走 URL"的客户端态） | 5.0.14 |
-| Lint | Biome（替代 ESLint） | 2.4.16 |
-| 测试 | Vitest + Testing Library | 4.1.8 |
-
-详见 PROPOSAL.md §3.1 / §8 / §9 / §10。
-
-## 快速开始
+## ⚡ 30 秒上手
 
 ```bash
-npm install
-npm run dev
+pnpm install
+cp .env.example .env.local       # 填 DEEPSEEK_API_KEY
+pnpm dev                          # localhost:3000
 ```
 
-打开 http://localhost:3000 查看首页。
+> `DEEPSEEK_API_KEY` 是唯一 **必填** 的 key（其它 provider 也能加，但只有 deepseek 走真流式）。
 
-## 工程脚本
+## ⌘K 全局快捷键
 
-```bash
-npm run dev         # Next dev server（默认 3000）
-npm run build       # 生产构建（12 静态页 + 5 API 路由）
-npm run typecheck   # tsc --noEmit
-npm run lint        # Biome check
-npm run lint:fix    # 自动修复
-npm run format      # Biome format
-npm run test        # Vitest 单次
-npm run test:watch  # Vitest 监听
-npm run check-deps  # 校对 npm latest 版本
-```
+- **⌘K / Ctrl+K** → 命令面板（跳 Lab / 跳子页 / 跳 404 demo / github）
+- 顶栏有 `search ⌘K` 按钮，hover 显示提示
 
-## 目录结构
+## 🧬 架构原则
 
-```
+1. **协议先行** — UI 描述先抽象成事件流，渲染是事件流的投影
+2. **Lab 隔离** — 每个 Lab 自包含可独立运行，共享 Core 但不互相耦合
+3. **DSL 渐进** — 从 JSON-UI 起，先能用，再好用
+4. **沙箱永远在线** — 任何 LLM 生成的 UI 代码默认在 iframe 隔离环境跑
+5. **状态分层** — Zustand 只补"跨组件 + 高频 + 不入 URL"的一块短板（详见 `/about`）
+
+## 📁 项目结构
+
+```text
 src/
-├─ app/
-│   ├─ (home 未实现)/  ← 占位：当前 / 是首页
-│   ├─ api/                # 5 个 stub 路由（chat/ag-ui/a2ui/eval/replay）
-│   ├─ labs/               # 4 个 Lab 总览 + 子页签
-│   │   ├─ streaming/      # Lab 1
-│   │   │   ├─ page.tsx
-│   │   │   ├─ markdown/   # 1.1.1（可点击模拟流式）
-│   │   │   ├─ ag-ui/      # 1.1.2（W4 占位）
-│   │   │   ├─ a2ui/       # 1.1.3（W5 占位）
-│   │   │   └─ compare/    # 1.1.4（W5 占位）
-│   │   ├─ codegen/        # Lab 2
-│   │   ├─ workbench/      # Lab 3
-│   │   └─ observability/  # Lab 4
-│   ├─ layout.tsx          # Root layout
-│   ├─ globals.css         # CSS 变量 + Tailwind v4 @theme
-│   └─ page.tsx            # 首页（Lab 入口 + 最近会话）
-│
-├─ components/
-│   ├─ ui/                 # shadcn/ui 组件（Button / Card / Badge / Separator）
-│   └─ theme-applier.tsx   # 主题应用器
-│
-├─ core/
-│   ├─ state/              # 5 个 Zustand store（ui / session / streaming / workbench / observability）
-│   ├─ protocols/          # 协议层（占位，W3 起落地）
-│   ├─ engine/             # 渲染引擎（占位，W6 起落地）
-│   ├─ agent/              # Agent 运行时（占位，W8 落地）
-│   ├─ models/             # 多模型 provider（占位，W2 落地）
-│   ├─ eval/               # 评分（占位，W11 落地）
-│   ├─ components/         # 组件注册表（占位，W2 落地）
-│   └─ session/            # 会话与回放（占位，W9 落地）
-│
-├─ features/               # 按 Lab 拆的功能模块（占位）
-├─ views/                  # 页面级 UI 编排（lab-sidebar + URL↔store 同步）
-├─ infra/                  # 工具/网络/存储（占位）
-└─ lib/                    # 工具函数（cn / formatDate / shortId 等）
+├── app/                      # App Router 路由
+│   ├── api/                  # SSE / REST endpoints
+│   │   ├── ag-ui/            # AG-UI mock SSE
+│   │   ├── a2ui/             # A2UI mock SSE
+│   │   ├── json-ui/          # JSON-UI patch SSE
+│   │   ├── chat/             # Markdown SSE + scenarios
+│   │   ├── keys/             # /api/keys — provider 状态
+│   │   ├── models/           # /api/models
+│   │   └── health/           # /api/health
+│   ├── labs/                 # 4 个 Lab 路由
+│   │   ├── streaming/        # Lab 1
+│   │   ├── codegen/          # Lab 2
+│   │   ├── workbench/        # Lab 3
+│   │   └── observability/    # Lab 4
+│   ├── settings/             # 站点设置
+│   ├── about/                # /about
+│   ├── not-found.tsx         # 404
+│   ├── error.tsx             # 错误 boundary
+│   └── layout.tsx            # root layout
+├── components/               # 共享 UI
+│   ├── site-header.tsx       # 顶栏（logo + 4 nav + model + theme + ⌘K + about + src）
+│   ├── site-footer.tsx       # footer
+│   ├── lab-sidebar.tsx       # Lab 导航
+│   ├── lab-hub.tsx           # Lab hub 通用壳
+│   ├── lab-content-page.tsx  # 子页通用壳
+│   ├── command-palette.tsx   # ⌘K 全局
+│   ├── settings-nav.tsx
+│   ├── home/                 # 首页 mini-demo
+│   ├── planned-sub-page.tsx  # W9-W12 子页骨架
+│   └── ui/                   # shadcn 组件
+├── core/
+│   ├── labs.ts               # 4 Lab 元数据（single source of truth）
+│   ├── models/registry.ts    # 13 models × 6 providers
+│   ├── protocols/            # 协议层
+│   │   ├── ag-ui/mapper.ts   # AG-UI → RenderableEvent
+│   │   ├── a2ui/mapper.ts    # A2UI → RenderableEvent
+│   │   ├── common/types.ts   # RenderableEvent
+│   │   └── README.md
+│   ├── engine/               # 渲染引擎
+│   │   ├── json-ui/          # JSON-UI 引擎（renderer / expr / types）
+│   │   └── sandbox/          # iframe 沙箱（W7）
+│   ├── state/                # 5 个 Zustand store
+│   │   ├── ui-store.ts
+│   │   ├── session-store.ts
+│   │   ├── streaming-store.ts
+│   │   ├── workbench-store.ts
+│   │   └── observability-store.ts
+│   └── render/
+│       └── markdown-renderer.tsx
+├── views/
+│   ├── lab-sidebar.tsx       # 老 lab-sidebar 副本（re-export，保留以便平滑迁移）
+│   └── sync-search-params.tsx
+├── infra/
+│   └── http/sse-client.ts    # SSE 客户端（fetchSse async iterator）
+└── lib/
+    └── utils.ts              # cn / className
+tests/                        # 68 vitest
 ```
 
-## 设计原则（PROPOSAL.md §6 / §9 摘要）
+## 🛠️ 常用命令
 
-- **协议先行**：UI 描述先抽象成事件流，渲染是事件流的投影
-- **Lab 隔离**：每个 Lab 自包含可独立运行，共享 Core 但不互相耦合
-- **DSL 渐进**：先能用，再好用
-- **沙箱永远在线**：LLM 生成的 UI 代码默认在 iframe 隔离环境跑
-- **失败是数据**：失败模式库是核心资产
-- **状态分层**：Zustand 只承担"跨组件 + 高频 + 不走 URL"的客户端态；其他归 RSC / URL / TanStack Query / react-hook-form
+```bash
+pnpm dev         # next dev
+pnpm verify      # biome + tsc + vitest + next build
+pnpm lint        # biome check
+pnpm lint:fix    # auto-fix
+pnpm test        # vitest
+pnpm check-deps  # 重新审计依赖 baseline
+```
 
-## 重要文档
+## 🔌 Provider 配置
 
-- [PROPOSAL.md](./PROPOSAL.md) — 项目方案（含功能设计 / 模块设计 / 技术栈 / 目录结构 / 12 周节奏 / 风险 / 依赖基线 / W1 落地记录）
-- [AGENTS.md](./AGENTS.md) — Next.js 16 警告（读 `node_modules/next/dist/docs/` 再写代码）
-- [CLAUDE.md](./CLAUDE.md) — Claude Code 提示规则
+详见 `/settings/models`（站点内）或 `.env.example`（仓库根）。
 
-## 路线图
+| Provider | 默认 models | 配 .env 变量 |
+|---|---|---|
+| DeepSeek | 2 | `DEEPSEEK_API_KEY` |
+| OpenAI | 3 | `OPENAI_API_KEY` |
+| Anthropic | 2 | `ANTHROPIC_API_KEY` |
+| Google | 2 | `GOOGLE_API_KEY` |
+| Qwen | 2 | `QWEN_API_KEY` |
+| Ollama | 2 | （不需要 key，可选 `OLLAMA_HOST`） |
 
-详见 PROPOSAL.md §4 + §10.4。
+## 📚 文档
 
-- **W1（已完成）**：脚手架 ✅
-- **W2**：多模型 provider + SSE 通道 + 真实 LLM 流
-- **W3**：Markdown 协议流式 + AG-UI 协议 reducer
-- **W4**：AG-UI 协议端到端
-- **W5**：A2UI 协议 + 协议对照台
-- **W6**：JSON-UI DSL 渲染（Lab 2 核心）
-- **W7**：TSX 沙箱
-- **W8**：Agent runtime（ReAct / Plan-Execute）
-- **W9**：Lab 3 三栏 Workbench
-- **W10**：Lab 3 Inspector / 错误热力 / Replay
-- **W11**：Lab 4 推理 DAG + Token 仪表 + 评分
-- **W12**：Prompt Lab + 失败模式库 + 文档收尾
+- [PROPOSAL.md](./PROPOSAL.md) — 完整方案（12 周路线图 + 设计原则 + 状态管理）
+- [CHANGELOG.md](./CHANGELOG.md) — 周节奏
+- [/.env.example](./.env.example) — 环境变量模板
+
+## 🐛 Debug
+
+- `?scenario=long|tools|error|reconnect` 加载 Lab 1.1.1 markdown 的不同 mock 场景
+- `/api/health` 站点状态
+- `/api/keys` provider 配置状态
+- `/this-does-not-exist` 看 404 demo

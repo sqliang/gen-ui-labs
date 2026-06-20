@@ -36,6 +36,14 @@ export default function JsonUiPage() {
   const [patches, setPatches] = useState<JsonUiPatch[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [stateTick, setStateTick] = useState(0);
+
+  // 演示 state binding：state 里的值会替换文档里的 {expr} 表达式
+  const bindingState: Record<string, unknown> = {
+    user: { name: stateTick % 2 === 0 ? "Alice" : "Bob" },
+    lab: "JSON-UI",
+    version: "0.1.0",
+  };
 
   const handleStart = useCallback(async () => {
     setIsLoading(true);
@@ -106,7 +114,24 @@ export default function JsonUiPage() {
                 </CardTitle>
               </CardHeader>
               <CardContent className="p-3 pt-0">
-                <JsonUiRenderer node={doc.root} />
+                <div className="space-y-3">
+                  <div className="border-foreground/10 bg-foreground/[0.03] flex items-center justify-between rounded-md border px-2.5 py-1.5">
+                    <div className="font-mono text-[10.5px]">
+                      <span className="text-muted-foreground/70">state.user.name</span>
+                      <span className="text-foreground/90 ml-1.5">
+                        {String((bindingState.user as { name: string }).name)}
+                      </span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setStateTick((t) => t + 1)}
+                      className="border-foreground/20 hover:border-foreground/40 rounded border px-2 py-0.5 font-mono text-[10px] transition-colors"
+                    >
+                      toggle ↻
+                    </button>
+                  </div>
+                  <JsonUiRenderer node={doc.root} state={bindingState} />
+                </div>
               </CardContent>
             </Card>
           </div>

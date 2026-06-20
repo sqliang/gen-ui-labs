@@ -4,24 +4,36 @@ import type { JSX } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { evaluateJsonUiNode } from "./expr";
 import type { JsonUiNode } from "./types";
 
 /**
  * JSON-UI → React 递归渲染器。W6 范围：card / button / text / table / flex / grid / chart / input。
+ *
+ * `state` 是 JSON-UI 表达式求值的数据源（DSL 字符串里写 `{user.name}` → state.user.name）。
+ * 没传 state 就当空对象，表达式保持原样。
  */
-function renderChildren(children?: JsonUiNode[]): JSX.Element | null {
+function renderChildren(children?: JsonUiNode[], state: unknown = {}): JSX.Element | null {
   if (!children || children.length === 0) return null;
+  const evalChildren = children.map((c) => evaluateJsonUiNode(c, state));
   return (
     <>
-      {children.map((child, i) => (
-        <JsonUiRenderer key={child.id ?? `child-${i}`} node={child} />
+      {evalChildren.map((child, i) => (
+        <JsonUiRenderer key={child.id ?? `child-${i}`} node={child} state={state} />
       ))}
     </>
   );
 }
 
-export function JsonUiRenderer({ node }: { node: JsonUiNode }): JSX.Element {
-  const p = node.props ?? {};
+export function JsonUiRenderer({
+  node,
+  state,
+}: {
+  node: JsonUiNode;
+  state?: unknown;
+}): JSX.Element {
+  const evaluated = evaluateJsonUiNode(node, state);
+  const p = evaluated.props ?? {};
 
   switch (node.type) {
     case "card":
@@ -32,7 +44,9 @@ export function JsonUiRenderer({ node }: { node: JsonUiNode }): JSX.Element {
               <CardTitle className="text-sm">{String(p.title)}</CardTitle>
             </CardHeader>
           ) : null}
-          <CardContent className="p-3 pt-0">{renderChildren(node.children)}</CardContent>
+          <CardContent className="p-3 pt-0">
+            {renderChildren(evaluated.children, state)}
+          </CardContent>
         </Card>
       );
 
@@ -81,10 +95,14 @@ export function JsonUiRenderer({ node }: { node: JsonUiNode }): JSX.Element {
     }
 
     case "flex":
-      return <div className="flex flex-wrap gap-2">{renderChildren(node.children)}</div>;
+      return (
+        <div className="flex flex-wrap gap-2">{renderChildren(evaluated.children, state)}</div>
+      );
 
     case "grid":
-      return <div className="grid grid-cols-2 gap-3">{renderChildren(node.children)}</div>;
+      return (
+        <div className="grid grid-cols-2 gap-3">{renderChildren(evaluated.children, state)}</div>
+      );
 
     case "chart": {
       const chartType = String(p.type ?? "bar");

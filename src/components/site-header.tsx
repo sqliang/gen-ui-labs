@@ -1,6 +1,6 @@
 "use client";
 
-import { ChevronDown, Moon, Sun } from "lucide-react";
+import { ChevronDown, Moon, Search, Sun } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 
@@ -18,6 +18,7 @@ import {
 import { Separator } from "@/components/ui/separator";
 import { BUILTIN_MODELS } from "@/core/models/registry";
 import { useSessionStore } from "@/core/state/session-store";
+import { useUiStore } from "@/core/state/ui-store";
 
 /**
  * 顶部栏 —— 站点 logo + 状态点 + 模型选择器 + 主题切换 + 导航。
@@ -37,6 +38,7 @@ export function SiteHeader() {
         <Separator orientation="vertical" className="hidden h-4 bg-white/10 sm:block" />
         <PrimaryNav />
         <div className="ml-auto flex items-center gap-2">
+          <CommandHint />
           <ModelSwitcher />
           <ThemeSwitcher />
           <AboutLink />
@@ -217,6 +219,24 @@ function AboutLink() {
     >
       about
     </Link>
+  );
+}
+
+function CommandHint() {
+  const toggleCommand = useUiStore((s) => s.toggleCommand);
+  return (
+    <button
+      type="button"
+      onClick={toggleCommand}
+      className="border-border/40 hover:border-border hover:bg-secondary/40 hidden items-center gap-1.5 rounded-md border px-2 py-1 font-mono text-[11px] text-muted-foreground transition-colors hover:text-foreground lg:flex"
+      aria-label="Open command palette (Cmd+K)"
+    >
+      <Search className="size-3" />
+      <span>search</span>
+      <kbd className="text-muted-foreground/70 border-foreground/15 ml-1 rounded border px-1 font-mono text-[9.5px]">
+        ⌘K
+      </kbd>
+    </button>
   );
 }
 

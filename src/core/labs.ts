@@ -218,7 +218,7 @@ export const LABS: LabDefinition[] = [
     miniDemo: "workbench",
     subPages: [
       {
-        href: "/labs/workbench",
+        href: "/labs/workbench/three-pane",
         number: "3.1.1",
         title: "三栏 Workbench",
         description: "左源码/DSL · 中过程事件 · 右实时渲染；与 Lab 1/2 联动",
@@ -228,7 +228,7 @@ export const LABS: LabDefinition[] = [
         protocol: "Workbench",
       },
       {
-        href: "/labs/workbench",
+        href: "/labs/workbench/inspector",
         number: "3.1.2",
         title: "节点 Inspector",
         description: "选中渲染区域，反向高亮 DSL/TSX 节点 + 数据 attribute",
@@ -237,7 +237,7 @@ export const LABS: LabDefinition[] = [
         protocol: "Inspector",
       },
       {
-        href: "/labs/workbench",
+        href: "/labs/workbench/heatmap",
         number: "3.1.3",
         title: "错误热力图",
         description: "把渲染异常叠加在源码上（运行时报错、布局错位）",
@@ -246,7 +246,7 @@ export const LABS: LabDefinition[] = [
         protocol: "Heatmap",
       },
       {
-        href: "/labs/workbench",
+        href: "/labs/workbench/replay",
         number: "3.1.4",
         title: "离线 Replay",
         description: "导入一次会话的 dump（事件 + 源码 + 中间态），完全离线重放",
@@ -283,7 +283,7 @@ export const LABS: LabDefinition[] = [
     miniDemo: "observability",
     subPages: [
       {
-        href: "/labs/observability",
+        href: "/labs/observability/tokens",
         number: "4.1.1",
         title: "Token 成本面板",
         description: "实时按模型统计 prompt / completion / 首 token 延迟",
@@ -293,7 +293,7 @@ export const LABS: LabDefinition[] = [
         protocol: "Tokens",
       },
       {
-        href: "/labs/observability",
+        href: "/labs/observability/tools",
         number: "4.1.2",
         title: "工具调用回放",
         description: "AG-UI 触发的工具调用全链路 + 时延可视化",
@@ -302,7 +302,7 @@ export const LABS: LabDefinition[] = [
         protocol: "Tools",
       },
       {
-        href: "/labs/observability",
+        href: "/labs/observability/reasoning",
         number: "4.1.3",
         title: "Agent 推理链",
         description: "ReAct / Plan / CoT 三种模式时间轴，可逐步回放",
@@ -311,7 +311,7 @@ export const LABS: LabDefinition[] = [
         protocol: "Reasoning",
       },
       {
-        href: "/labs/observability",
+        href: "/labs/observability/score",
         number: "4.1.4",
         title: "UI 评分卡",
         description: "同 prompt 多模型生成，统一评分卡横向对比",

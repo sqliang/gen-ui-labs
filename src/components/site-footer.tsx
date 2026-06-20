@@ -61,6 +61,14 @@ export function SiteFooter() {
             <ul className="space-y-1.5">
               <li>
                 <Link
+                  href="/settings/models"
+                  className="text-foreground/85 hover:text-foreground font-mono text-[12px] transition-colors"
+                >
+                  settings
+                </Link>
+              </li>
+              <li>
+                <Link
                   href="/about"
                   className="text-foreground/85 hover:text-foreground font-mono text-[12px] transition-colors"
                 >

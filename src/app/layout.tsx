@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 
+import { CommandPalette } from "@/components/command-palette";
 import { SiteFooter } from "@/components/site-footer";
 import { SiteHeader } from "@/components/site-header";
 import { ThemeApplier } from "@/components/theme-applier";
@@ -43,6 +44,7 @@ export default function RootLayout({
           <div className="min-w-0 flex-1">{children}</div>
           <SiteFooter />
         </div>
+        <CommandPalette />
       </body>
     </html>
   );
