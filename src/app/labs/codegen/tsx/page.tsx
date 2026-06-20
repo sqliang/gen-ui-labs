@@ -1,8 +1,9 @@
 "use client";
 
-import { useCallback, useRef, useState } from "react";
+import { Play, RotateCcw } from "lucide-react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
-import { Badge } from "@/components/ui/badge";
+import { LabContentPage } from "@/components/lab-content-page";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
@@ -89,6 +90,12 @@ export default function TsxPage() {
     iframeRef.current.contentWindow.postMessage({ id: Date.now(), code }, window.location.origin);
   }, [code]);
 
+  const handleReset = useCallback(() => {
+    setCode(DEMO_CODE);
+    setResult(null);
+    setErrMsg(null);
+  }, []);
+
   const handleMessage = useCallback((event: MessageEvent) => {
     if (event.data?.type !== "sandbox-result") return;
     if (event.data.ok) {
@@ -98,78 +105,84 @@ export default function TsxPage() {
     }
   }, []);
 
-  // 监听 sandbox 回传
-  if (typeof window !== "undefined") {
+  useEffect(() => {
     window.addEventListener("message", handleMessage);
-  }
+    return () => window.removeEventListener("message", handleMessage);
+  }, [handleMessage]);
+
+  const errorMsg = errMsg;
 
   return (
-    <div className="mx-auto w-full max-w-6xl px-6 py-8">
-      <header className="mb-4">
-        <div className="flex items-center gap-2">
-          <h1 className="text-xl font-bold tracking-tight">2.1.1 TSX 代码生成</h1>
-          <Badge variant="outline">W7 · Sandbox</Badge>
-        </div>
-        <p className="text-muted-foreground mt-1 text-sm">
-          LLM 生成 React TSX 代码 → iframe sandbox 安全执行 → 实时渲染
-        </p>
-      </header>
-
-      <div className="grid grid-cols-2 gap-4">
-        {/* 左侧：代码编辑 */}
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between p-3">
-            <CardTitle className="text-sm">代码（React.createElement）</CardTitle>
-            <Button size="sm" onClick={handleRun}>
-              运行
-            </Button>
-          </CardHeader>
-          <CardContent className="p-3 pt-0">
-            <textarea
-              value={code}
-              onChange={(e) => setCode(e.target.value)}
-              className="bg-muted border-input font-mono text-[11px] leading-relaxed w-full min-h-[24rem] rounded-md border p-3 focus:outline-none"
-              spellCheck={false}
-            />
-          </CardContent>
-        </Card>
-
-        {/* 右侧：渲染结果 */}
-        <div className="space-y-3">
-          <Card>
-            <CardHeader className="p-3">
-              <CardTitle className="text-sm">渲染结果（iframe sandbox）</CardTitle>
+    <LabContentPage
+      labId="codegen"
+      subNumber="2.1.1"
+      title="TSX 代码生成"
+      protocolLabel="W7 · Sandbox iframe"
+      description="LLM 生成 React/TSX 代码 → 编译成 createElement → 在 sandbox iframe 中安全执行 → 实时渲染。所有 DOM 操作隔离在 iframe 内，主页面安全。"
+      onStart={handleRun}
+      onReset={handleReset}
+      startLabel="运行"
+      errorMsg={errorMsg}
+      outputTitle="code editor + sandbox output"
+      outputExtra={
+        result ? <span className="font-mono text-[10px] text-emerald-300">✓ {result}</span> : null
+      }
+      output={
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+          {/* 左：代码编辑 */}
+          <Card className="bg-card/30 border-foreground/5">
+            <CardHeader className="flex flex-row items-center justify-between p-3">
+              <CardTitle className="font-mono text-[11px] tracking-wide uppercase">
+                generated code
+              </CardTitle>
+              <div className="flex items-center gap-1.5">
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={handleReset}
+                  className="h-7 px-2 text-[10.5px]"
+                >
+                  <RotateCcw className="size-3" /> 重置
+                </Button>
+                <Button size="sm" onClick={handleRun} className="h-7 gap-1 px-2 text-[10.5px]">
+                  <Play className="size-3" /> 运行
+                </Button>
+              </div>
             </CardHeader>
             <CardContent className="p-3 pt-0">
-              <div className="border-muted min-h-[20rem] overflow-hidden rounded-md border">
+              <textarea
+                value={code}
+                onChange={(e) => setCode(e.target.value)}
+                className="bg-[#0d1117] border-foreground/10 text-foreground/90 placeholder:text-muted-foreground/40 focus-visible:border-foreground/30 w-full min-h-[28rem] rounded-md border p-3 font-mono text-[11.5px] leading-relaxed focus-visible:outline-none"
+                spellCheck={false}
+              />
+            </CardContent>
+          </Card>
+
+          {/* 右：渲染结果 */}
+          <Card className="bg-card/30 border-foreground/5">
+            <CardHeader className="p-3">
+              <CardTitle className="font-mono text-[11px] tracking-wide uppercase">
+                sandbox output
+                <span className="text-muted-foreground/70 ml-1.5 font-normal">
+                  (iframe · allow-scripts)
+                </span>
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="p-3 pt-0">
+              <div className="border-foreground/10 min-h-[28rem] overflow-hidden rounded-md border">
                 <iframe
                   ref={iframeRef}
                   src="/sandbox-iframe"
                   title="sandbox"
-                  className="h-full w-full min-h-[20rem] border-0"
+                  className="h-full w-full min-h-[28rem] border-0"
                   sandbox="allow-scripts allow-same-origin"
                 />
               </div>
             </CardContent>
           </Card>
-
-          {result !== null ? (
-            <Card className="border-green-500/50">
-              <CardContent className="p-3 text-green-600 dark:text-green-400 font-mono text-[10px]">
-                ✅ {result}
-              </CardContent>
-            </Card>
-          ) : null}
-
-          {errMsg ? (
-            <Card className="border-destructive/50">
-              <CardContent className="p-3 text-destructive font-mono text-[10px]">
-                ❌ {errMsg}
-              </CardContent>
-            </Card>
-          ) : null}
         </div>
-      </div>
-    </div>
+      }
+    />
   );
 }

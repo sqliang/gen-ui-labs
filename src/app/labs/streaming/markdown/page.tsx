@@ -1,9 +1,15 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+
+import {
+  Field,
+  LabContentPage,
+  PresetChips,
+  SourceToggle,
+  StatusPill,
+  TextInput,
+} from "@/components/lab-content-page";
 import type { RenderableEvent } from "@/core/protocols/common/types";
 import { extractMetricsFromChunks } from "@/core/render/extract-metrics";
 import { MarkdownRenderer } from "@/core/render/markdown-renderer";
@@ -11,15 +17,12 @@ import { useObservabilityStore } from "@/core/state/observability-store";
 import { useSessionStore } from "@/core/state/session-store";
 import { useStreamingStore } from "@/core/state/streaming-store";
 import { fetchSse } from "@/infra/http/sse-client";
-import { cn } from "@/lib/utils";
 
 /** 数据源：mock（本地 setTimeout）/ api（真 /api/chat SSE） */
 type StreamSource = "mock" | "api";
 
 interface PromptPreset {
-  /** 显示名 */
   label: string;
-  /** 真实 prompt 内容（也作为 mock 关键词匹配） */
   prompt: string;
 }
 
@@ -31,36 +34,25 @@ const PROMPT_PRESETS: PromptPreset[] = [
 ];
 
 /**
- * Lab 1.1.1 Markdown 流式渲染（W4-4 升级）。
+ * Lab 1.1.1 Markdown 流式渲染。
  *
  * 行为：
- * - source=mock：本地 setTimeout 模拟（不需要任何 API key；走 streaming-store 直接拼文本）
+ * - source=mock：本地 setTimeout 模拟（不需要任何 API key）
  * - source=api：真 fetch /api/chat SSE（带 AbortController + Zod 校验过的 meta chunk）
- *
- * Observability：
- * - api 模式下，每次成功的流都会把 firstTokenLatencyMs / totalDurationMs
- *   通过 observability-store.addTokenUsage 记录到当前 model
- *
- * 协议层：当前是纯 Markdown 协议。AG-UI / A2UI / JSON-UI 的"协议 + 组件 + 数据"
- * 转换留 W4-3（core/protocols/common/ 落）。
  */
 export default function MarkdownStreamingPage() {
-  // --- store subscriptions ---
   const { accumulatedText, isStreaming, start, append, finish, reset, chunks } =
     useStreamingStore();
   const currentModelId = useSessionStore((s) => s.currentModelId);
   const addTokenUsage = useObservabilityStore((s) => s.addTokenUsage);
 
-  // --- local state ---
   const [source, setSource] = useState<StreamSource>("mock");
   const [activePreset, setActivePreset] = useState<string>(PROMPT_PRESETS[0]?.label ?? "");
   const [customPrompt, setCustomPrompt] = useState("");
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
-  // --- refs（不让 React 重渲拿到 AbortController）---
   const abortRef = useRef<AbortController | null>(null);
 
-  // 卸载时取消 in-flight + 清空
   useEffect(() => {
     return () => {
       abortRef.current?.abort();
@@ -68,11 +60,6 @@ export default function MarkdownStreamingPage() {
     };
   }, [reset]);
 
-  /**
-   * Mock 模式：本地 setTimeout 推 chunk。
-   * 不走 SSE 客户端，只调 streaming-store.append，
-   * 等于测的是"store + renderer"本身。
-   */
   const runMock = async (prompt: string) => {
     start("markdown");
     setErrorMsg(null);
@@ -88,13 +75,6 @@ export default function MarkdownStreamingPage() {
     finish();
   };
 
-  /**
-   * API 模式：真 fetch /api/chat SSE。
-   * 处理：
-   * - start: meta chunk 记录 firstTokenLatencyMs
-   * - text: append 累文本
-   * - end / error: 收尾；成功则落 totalDurationMs + addTokenUsage
-   */
   const runApi = async (prompt: string) => {
     const ctrl = new AbortController();
     abortRef.current = ctrl;
@@ -112,18 +92,14 @@ export default function MarkdownStreamingPage() {
         try {
           chunk = JSON.parse(evt.data) as RenderableEvent;
         } catch {
-          // 跳过非 JSON 行（[DONE] 等）
           continue;
         }
 
-        // 抓 meta（firstTokenLatency / totalDuration）
         if (chunk.kind === "control" && chunk.type === "meta" && chunk.meta) {
-          // meta 也 append 进 streaming-store（重放/导出时完整）
           append(chunk);
           continue;
         }
 
-        // 错误
         if (chunk.kind === "control" && chunk.type === "error") {
           const meta = (chunk.meta ?? {}) as { message?: string; aborted?: boolean };
           if (!meta.aborted) {
@@ -136,7 +112,6 @@ export default function MarkdownStreamingPage() {
         if (chunk.kind === "control" && chunk.type === "end") break;
       }
     } catch (err) {
-      // abort 是预期，吞掉
       if (!(err instanceof DOMException && err.name === "AbortError")) {
         const msg = err instanceof Error ? err.message : String(err);
         setErrorMsg(msg);
@@ -144,8 +119,6 @@ export default function MarkdownStreamingPage() {
       }
     } finally {
       finish();
-      // 从 streaming-store 拿瞬时 chunks 算指标，落 observability
-      // （用 getState() 避免订阅 chunks 触发重渲）
       const allChunks = useStreamingStore.getState().chunks;
       const metrics = extractMetricsFromChunks(allChunks);
       if (metrics.firstTokenLatencyMs !== undefined) {
@@ -177,149 +150,106 @@ export default function MarkdownStreamingPage() {
     finish();
   };
 
-  // 派生 UI 状态
   const charCount = accumulatedText.length;
   const chunkCount = chunks.length;
   const firstTokenLatency = extractMetricsFromChunks(chunks).firstTokenLatencyMs;
 
-  return (
-    <div className="mx-auto w-full max-w-4xl px-6 py-8">
-      <header className="mb-6">
-        <div className="flex flex-wrap items-center gap-2">
-          <h1 className="text-xl font-bold tracking-tight">1.1.1 Markdown 流式渲染</h1>
-          <Badge variant="outline">W4-4 · Markdown 协议</Badge>
-          <Badge variant="secondary" className="font-mono text-[10px]">
-            {currentModelId}
-          </Badge>
-          {isStreaming ? (
-            <Badge variant="default" className="font-mono text-[10px]">
-              streaming…
-            </Badge>
-          ) : null}
-        </div>
-        <p className="text-muted-foreground mt-1 text-sm">
-          流式 source：<code className="text-foreground">{source}</code> ·
-          {charCount > 0 ? ` ${charCount} 字符` : " 空"}
-          {chunkCount > 0 ? ` · ${chunkCount} chunks` : ""}
-        </p>
-      </header>
-
-      {/* source 切换 */}
-      <div className="mb-4 flex items-center gap-2">
-        <span className="text-muted-foreground text-xs">数据源</span>
-        <SourceToggle value={source} onChange={setSource} disabled={isStreaming} />
-        <span className="text-muted-foreground ml-3 text-[11px]">
-          {source === "mock"
-            ? "本地 setTimeout 模拟（无需 API Key）"
-            : "真 /api/chat SSE（需 provider 有 key）"}
-        </span>
+  const toolbar = (
+    <div className="space-y-3 rounded-xl border border-foreground/[0.06] bg-foreground/[0.02] p-4">
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+        <Field
+          label="数据源"
+          hint={
+            source === "mock"
+              ? "本地 setTimeout 模拟（无需 API Key）"
+              : "真 /api/chat SSE（需 provider 有 key）"
+          }
+        >
+          <SourceToggle
+            value={source}
+            onChange={setSource}
+            disabled={isStreaming}
+            options={[
+              { label: "mock", value: "mock" },
+              { label: "api", value: "api" },
+            ]}
+          />
+        </Field>
       </div>
-
-      {/* preset + 自定义 prompt */}
-      <div className="mb-4 space-y-2">
-        <div className="flex flex-wrap gap-2">
-          {PROMPT_PRESETS.map((p) => (
-            <Button
-              key={p.label}
-              size="sm"
-              variant={activePreset === p.label ? "default" : "outline"}
-              onClick={() => {
-                setActivePreset(p.label);
-                setCustomPrompt("");
-              }}
-              disabled={isStreaming}
-            >
-              {p.label}
-            </Button>
-          ))}
-        </div>
-        <input
-          type="text"
-          value={customPrompt}
-          onChange={(e) => setCustomPrompt(e.target.value)}
-          placeholder="自定义 prompt（覆盖上方 preset）"
-          className="border-input bg-background placeholder:text-muted-foreground focus-visible:ring-ring w-full rounded-md border px-3 py-1.5 text-sm focus-visible:outline-none focus-visible:ring-2"
+      <div className="space-y-2">
+        <span className="text-muted-foreground/70 font-mono text-[11px] uppercase tracking-wider">
+          prompt preset
+        </span>
+        <PresetChips
+          value={activePreset}
+          onChange={(v) => {
+            setActivePreset(v);
+            setCustomPrompt("");
+          }}
           disabled={isStreaming}
+          options={PROMPT_PRESETS.map((p) => ({ label: p.label, value: p.label }))}
         />
       </div>
-
-      <div className="mb-4 flex gap-2">
-        <Button onClick={handleStart} disabled={isStreaming}>
-          {isStreaming ? "渲染中…" : "开始流式渲染"}
-        </Button>
-        <Button onClick={handleStop} variant="outline" disabled={!isStreaming}>
-          停止
-        </Button>
-        <Button onClick={reset} variant="ghost" disabled={isStreaming}>
-          清空
-        </Button>
-      </div>
-
-      {errorMsg ? (
-        <Card className="mb-4 border-destructive/50">
-          <CardContent className="p-3 text-destructive text-sm">
-            <strong>错误：</strong>
-            {errorMsg}
-          </CardContent>
-        </Card>
-      ) : null}
-
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between gap-2 p-4">
-          <CardTitle className="text-sm">输出（rendered by react-markdown）</CardTitle>
-          {isStreaming ? (
-            <span className="text-muted-foreground font-mono text-[10px]">
-              {charCount} 字符 / {chunkCount} chunks
-              {firstTokenLatency !== undefined ? ` · 首 token ${firstTokenLatency}ms` : ""}
-            </span>
-          ) : null}
-        </CardHeader>
-        <CardContent className="p-4 pt-0">
-          {accumulatedText ? (
-            <MarkdownRenderer
-              source={accumulatedText}
-              isStreaming={isStreaming}
-              className="bg-card max-h-[32rem] overflow-auto rounded-md p-3 scrollbar-thin"
-            />
-          ) : (
-            <p className="text-muted-foreground text-sm">
-              （点击「开始流式渲染」，从 <code>{source}</code> 拉取）
-            </p>
-          )}
-        </CardContent>
-      </Card>
+      <TextInput
+        value={customPrompt}
+        onChange={setCustomPrompt}
+        placeholder="自定义 prompt（覆盖上方 preset）"
+        disabled={isStreaming}
+      />
     </div>
   );
-}
 
-function SourceToggle({
-  value,
-  onChange,
-  disabled,
-}: {
-  value: StreamSource;
-  onChange: (v: StreamSource) => void;
-  disabled?: boolean;
-}) {
   return (
-    <div className="border-input inline-flex rounded-md border p-0.5">
-      {(["mock", "api"] as const).map((v) => (
-        <button
-          key={v}
-          type="button"
-          onClick={() => onChange(v)}
-          disabled={disabled}
-          className={cn(
-            "rounded px-2 py-1 text-xs transition-colors disabled:opacity-50",
-            value === v
-              ? "bg-primary text-primary-foreground"
-              : "text-muted-foreground hover:text-foreground",
-          )}
-        >
-          {v}
-        </button>
-      ))}
-    </div>
+    <LabContentPage
+      labId="streaming"
+      subNumber="1.1.1"
+      title="Markdown 流式渲染"
+      protocolLabel="W4 · Markdown 协议"
+      description="基于 react-markdown + GFM + 代码高亮。支持 mock/api 双源切换，AbortController 中断，observability 指标自动落库。"
+      status={
+        <div className="flex items-center gap-1.5">
+          <StatusPill label={currentModelId} tone="accent" />
+        </div>
+      }
+      isStreaming={isStreaming}
+      errorMsg={errorMsg}
+      onStart={handleStart}
+      onStop={handleStop}
+      onReset={reset}
+      toolbar={toolbar}
+      outputTitle="rendered output"
+      outputEmpty={!accumulatedText}
+      outputEmptyHint={
+        <p className="text-muted-foreground/70 font-mono text-[12px]">
+          （点击「开始流式渲染」从 <span className="text-foreground/80">{source}</span> 拉取 →
+          这里会出现 Markdown 渲染结果）
+        </p>
+      }
+      outputExtra={
+        <>
+          <span className="text-muted-foreground/70 font-mono text-[10px] tabular-nums">
+            {charCount} chars
+          </span>
+          <span className="text-muted-foreground/40">·</span>
+          <span className="text-muted-foreground/70 font-mono text-[10px] tabular-nums">
+            {chunkCount} chunks
+          </span>
+          {firstTokenLatency !== undefined ? (
+            <>
+              <span className="text-muted-foreground/40">·</span>
+              <span className="font-mono text-[10px] tabular-nums text-emerald-300">
+                first token {firstTokenLatency}ms
+              </span>
+            </>
+          ) : null}
+        </>
+      }
+      output={
+        accumulatedText ? (
+          <MarkdownRenderer source={accumulatedText} isStreaming={isStreaming} />
+        ) : null
+      }
+    />
   );
 }
 

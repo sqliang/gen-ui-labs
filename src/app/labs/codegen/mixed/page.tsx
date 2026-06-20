@@ -1,13 +1,13 @@
 "use client";
 
 import { useCallback, useRef } from "react";
-import { Badge } from "@/components/ui/badge";
+
+import { LabContentPage } from "@/components/lab-content-page";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { JsonUiRenderer } from "@/core/engine/json-ui/renderer";
 import type { JsonUiDocument } from "@/core/engine/json-ui/types";
 
-/** 同一 UI 的 DSL 表达（JSON-UI 格式） */
 const DSL_DOC: JsonUiDocument = {
   root: {
     type: "card",
@@ -46,7 +46,6 @@ const DSL_DOC: JsonUiDocument = {
   },
 };
 
-/** 同等 TSX 代码（纯 JS DOM，沙箱执行） */
 const TSX_CODE = `var card = document.createElement('div');
 card.style.border = '1px solid #27272a';
 card.style.borderRadius = '8px';
@@ -119,93 +118,133 @@ export default function MixedPage() {
   }, []);
 
   return (
-    <div className="mx-auto w-full max-w-6xl px-6 py-8">
-      <header className="mb-4">
-        <div className="flex items-center gap-2">
-          <h1 className="text-xl font-bold tracking-tight">2.1.3 混合（DSL + TSX）</h1>
-          <Badge variant="outline">W8 · 统一管道</Badge>
-        </div>
-        <p className="text-muted-foreground mt-1 text-sm">
-          同一 UI 的两种表达：JSON-UI DSL vs TSX 沙箱 → 对照评估
-        </p>
-      </header>
+    <LabContentPage
+      labId="codegen"
+      subNumber="2.1.3"
+      title="混合（DSL + TSX）"
+      protocolLabel="W8 · 统一管道"
+      description="同一 UI 的两种表达：JSON-UI DSL 走 React 组件树（左） vs TSX 走 sandbox iframe（右）。对照评估两种管道的开发成本、安全性、表达能力。"
+      onStart={runTsx}
+      startLabel="运行 TSX"
+      outputTitle="dsl vs tsx · side-by-side"
+      output={
+        <div className="space-y-4">
+          {/* 双栏对比 */}
+          <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+            {/* 左：JSON-UI DSL */}
+            <Card className="bg-card/30 border-foreground/5">
+              <CardHeader className="p-3">
+                <CardTitle className="font-mono text-[11px] tracking-wide uppercase">
+                  json-ui dsl
+                  <span className="text-muted-foreground/70 ml-1.5 font-normal">
+                    · JsonUiRenderer
+                  </span>
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="p-3 pt-0">
+                <div className="min-h-[24rem]">
+                  <JsonUiRenderer node={DSL_DOC.root} />
+                </div>
+              </CardContent>
+            </Card>
 
-      <div className="grid grid-cols-2 gap-4">
-        {/* 左：JSON-UI DSL */}
-        <Card>
-          <CardHeader className="p-3">
-            <CardTitle className="text-sm">
-              JSON-UI DSL 管道
-              <Badge variant="secondary" className="ml-2 text-[9px]">
-                JsonUiRenderer
-              </Badge>
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="p-3 pt-0">
-            <div className="min-h-[20rem]">
-              <JsonUiRenderer node={DSL_DOC.root} />
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* 右：TSX 沙箱 */}
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between p-3">
-            <CardTitle className="text-sm">
-              TSX Sandbox 管道
-              <Badge variant="secondary" className="ml-2 text-[9px]">
-                eval → DOM → iframe
-              </Badge>
-            </CardTitle>
-            <Button size="sm" onClick={runTsx}>
-              运行 TSX
-            </Button>
-          </CardHeader>
-          <CardContent className="p-3 pt-0">
-            <div className="border-muted min-h-[20rem] overflow-hidden rounded-md border">
-              <iframe
-                ref={iframeRef}
-                src="/sandbox-iframe"
-                title="sandbox-mixed"
-                className="h-full w-full min-h-[20rem] border-0"
-                sandbox="allow-scripts allow-same-origin"
-              />
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* 对照评估 */}
-      <Card className="mt-4">
-        <CardHeader className="p-3">
-          <CardTitle className="text-sm">对照评估</CardTitle>
-        </CardHeader>
-        <CardContent className="p-3 pt-0">
-          <div className="grid grid-cols-2 gap-4 text-xs">
-            <div className="space-y-1">
-              <p className="text-primary font-bold">JSON-UI DSL</p>
-              <p className="text-muted-foreground">
-                ✅ 声明式，结构清晰
-                <br />✅ 服务器可控（LLM 生成 DSL 比代码安全）
-                <br />✅ 增量 patching（JSON Patch）
-                <br />
-                ⚠️ 表达能力有限（card/table/button/...）
-              </p>
-            </div>
-            <div className="space-y-1">
-              <p className="text-primary font-bold">TSX Sandbox</p>
-              <p className="text-muted-foreground">
-                ✅ 图灵完备（任意 UI 均可表达）
-                <br />✅ 开发者友好（熟悉的 JS）
-                <br />
-                ⚠️ 安全需要沙箱隔离
-                <br />
-                ⚠️ LLM 生成代码质量不稳定
-              </p>
-            </div>
+            {/* 右：TSX Sandbox */}
+            <Card className="bg-card/30 border-foreground/5">
+              <CardHeader className="flex flex-row items-center justify-between p-3">
+                <CardTitle className="font-mono text-[11px] tracking-wide uppercase">
+                  tsx sandbox
+                  <span className="text-muted-foreground/70 ml-1.5 font-normal">
+                    · eval → DOM → iframe
+                  </span>
+                </CardTitle>
+                <Button size="sm" onClick={runTsx} className="h-7 px-2 text-[10.5px]">
+                  运行 TSX
+                </Button>
+              </CardHeader>
+              <CardContent className="p-3 pt-0">
+                <div className="border-foreground/10 min-h-[24rem] overflow-hidden rounded-md border">
+                  <iframe
+                    ref={iframeRef}
+                    src="/sandbox-iframe"
+                    title="sandbox-mixed"
+                    className="h-full w-full min-h-[24rem] border-0"
+                    sandbox="allow-scripts allow-same-origin"
+                  />
+                </div>
+              </CardContent>
+            </Card>
           </div>
-        </CardContent>
-      </Card>
+
+          {/* 对照评估 */}
+          <Card className="bg-card/30 border-foreground/5">
+            <CardHeader className="p-3">
+              <CardTitle className="font-mono text-[11px] tracking-wide uppercase">
+                trade-offs · 评估对照
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="p-3 pt-0">
+              <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                <ProsCons
+                  protocol="JSON-UI DSL"
+                  accent="oklch(0.7 0.18 290)"
+                  pros={[
+                    "声明式，结构清晰",
+                    "服务器可控（LLM 生成 DSL 比代码安全）",
+                    "增量 patching（JSON Patch）",
+                  ]}
+                  cons={["表达能力有限（card/table/button/...）"]}
+                />
+                <ProsCons
+                  protocol="TSX Sandbox"
+                  accent="oklch(0.78 0.16 75)"
+                  pros={["图灵完备（任意 UI 均可表达）", "开发者友好（熟悉的 JS）"]}
+                  cons={["安全需要沙箱隔离", "LLM 生成代码质量不稳定"]}
+                />
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      }
+    />
+  );
+}
+
+function ProsCons({
+  protocol,
+  accent,
+  pros,
+  cons,
+}: {
+  protocol: string;
+  accent: string;
+  pros: string[];
+  cons: string[];
+}) {
+  return (
+    <div
+      className="bg-card/40 border-foreground/10 rounded-lg border p-3"
+      style={{ boxShadow: `inset 0 0 0 1px ${accent.replace(")", " / 0.3)")}` }}
+    >
+      <div
+        className="mb-2 font-mono text-[11px] font-bold tracking-wide uppercase"
+        style={{ color: accent }}
+      >
+        {protocol}
+      </div>
+      <ul className="space-y-1 text-[12px]">
+        {pros.map((p) => (
+          <li key={p} className="text-foreground/85 flex items-start gap-1.5 leading-relaxed">
+            <span className="text-emerald-400 mt-0.5">✓</span>
+            <span>{p}</span>
+          </li>
+        ))}
+        {cons.map((c) => (
+          <li key={c} className="text-foreground/85 flex items-start gap-1.5 leading-relaxed">
+            <span className="text-amber-400 mt-0.5">⚠</span>
+            <span>{c}</span>
+          </li>
+        ))}
+      </ul>
     </div>
   );
 }

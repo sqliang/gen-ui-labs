@@ -1,7 +1,6 @@
 "use client";
 
 import {
-  ArrowRight,
   CheckCircle2,
   CircleDashed,
   CornerDownRight,
@@ -9,13 +8,13 @@ import {
   Loader2,
   MapPin,
   Play,
-  Square,
   Wrench,
   X,
   XCircle,
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 
+import { FlowArrow, LabContentPage } from "@/components/lab-content-page";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -663,324 +662,323 @@ export default function AguiPage() {
       : null;
 
   return (
-    <div className="mx-auto w-full max-w-7xl px-6 py-8">
-      <header className="mb-6">
-        <div className="flex flex-wrap items-center gap-2">
-          <h1 className="text-xl font-bold tracking-tight">1.1.2 AG-UI 协议流式</h1>
-          <Badge variant="outline">W4-3 · AG-UI v0.2</Badge>
-          <LifecycleBadge state={lifecycle} />
-          {isStreaming ? (
-            <Badge variant="default" className="font-mono text-[10px]">
-              <Loader2 className="mr-1 size-2.5 animate-spin" /> streaming
-            </Badge>
-          ) : null}
+    <LabContentPage
+      labId="streaming"
+      subNumber="1.1.2"
+      title="AG-UI 协议流式"
+      protocolLabel="W4-3 · AG-UI v0.2"
+      description="AG-UI 是面向 agent 的结构化事件流协议。用 typed events 区分文本、工具调用、状态更新，渲染层按 event type 分发到不同 UI 组件。"
+      status={<LifecycleBadge state={lifecycle} />}
+      isStreaming={isStreaming}
+      errorMsg={errorMsg}
+      onStart={handleStart}
+      onStop={handleStop}
+      onReset={handleReset}
+      startLabel="开始 AG-UI 流式"
+      outputTitle="ag-ui · stream inspector"
+      outputEmpty={rawEvents.length === 0}
+      outputEmptyHint={
+        <div className="text-muted-foreground/70 py-10 text-center font-mono text-[12px]">
+          点击「开始 AG-UI 流式」→
+          <br />
+          下方会出现协议流转图 + 三栏调试视图
         </div>
-        <p className="text-muted-foreground mt-1 text-sm">
-          AG-UI 是一套面向 agent 的{" "}
-          <span className="text-foreground font-medium">结构化事件流协议</span>
-          。与 Markdown 协议不同：AG-UI 用 <code className="text-foreground">typed events</code>{" "}
-          区分文本、工具调用、状态更新，渲染层按 event type 分发到不同 UI 组件。
-        </p>
-      </header>
-
-      <div className="mb-4 flex flex-wrap gap-2">
-        <Button onClick={handleStart} disabled={isStreaming}>
-          <Play className="size-3.5" /> {isStreaming ? "流式中…" : "开始 AG-UI 流式"}
-        </Button>
-        <Button onClick={handleStop} variant="outline" disabled={!isStreaming}>
-          <Square className="size-3.5" /> 停止
-        </Button>
-        <Button onClick={handleReset} variant="ghost" disabled={isStreaming}>
-          清空
-        </Button>
-        <span className="text-muted-foreground ml-auto self-center font-mono text-[10px]">
-          {chunks.length} chunks · {now}ms
-        </span>
-      </div>
-
-      {errorMsg ? (
-        <Card className="border-destructive/50 bg-destructive/5 mb-4">
-          <CardContent className="p-3 text-destructive flex items-center gap-2 text-sm">
-            <XCircle className="size-4" />
-            <strong>错误：</strong>
-            {errorMsg}
-          </CardContent>
-        </Card>
-      ) : null}
-
-      {/* === 协议流转图（用户一眼懂 AG-UI 是怎么流的） === */}
-      <Card className="mb-4">
-        <CardHeader className="p-4 pb-2">
-          <CardTitle className="text-sm">AG-UI 事件流 · 一条消息的生命周期</CardTitle>
-        </CardHeader>
-        <CardContent className="p-4 pt-2">
-          <div className="flex flex-wrap items-center gap-1.5 text-[11px] font-mono">
-            <FlowChip color="emerald" label="RUN_STARTED" />
-            <ArrowRight className="text-muted-foreground size-3.5" />
-            <FlowChip color="sky" label="TEXT_MESSAGE_CONTENT" small="×n" />
-            <ArrowRight className="text-muted-foreground size-3.5" />
-            <FlowChip color="amber" label="TOOL_CALL_START" />
-            <ArrowRight className="text-muted-foreground size-3.5" />
-            <FlowChip color="amber" label="TOOL_CALL_ARGS" small="×n" />
-            <ArrowRight className="text-muted-foreground size-3.5" />
-            <FlowChip color="amber" label="TOOL_CALL_END" />
-            <ArrowRight className="text-muted-foreground size-3.5" />
-            <FlowChip color="sky" label="TEXT_MESSAGE_CONTENT" small="×n" />
-            <ArrowRight className="text-muted-foreground size-3.5" />
-            <FlowChip color="emerald" label="RUN_FINISHED" />
-          </div>
-          <p className="text-muted-foreground mt-2 text-[11px]">
-            ↓ 这一组事件流正在本页右下角实时跑 · 点击「开始 AG-UI 流式」观察每个事件单独到达 →
-          </p>
-        </CardContent>
-      </Card>
-
-      {/* === 三栏主视图 === */}
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-12">
-        {/* ──── 左栏：事件类型字典（AG-UI 协议全貌） ──── */}
-        <Card className="lg:col-span-3">
-          <CardHeader className="p-3">
-            <CardTitle className="text-xs">
-              AG-UI 事件类型
-              <span className="text-muted-foreground ml-1 font-normal">(9 种 / 4 类)</span>
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="p-3 pt-0">
-            <ul className="space-y-2">
-              {AGUI_EVENT_TYPES.map((t) => {
-                const palette = paletteFor(t.color);
-                return (
-                  <li key={t.type} className="flex items-start gap-2">
-                    <span
-                      className={cn(
-                        "mt-1 size-2 shrink-0 rounded-full ring-2",
-                        palette.dot,
-                        palette.ring,
-                      )}
-                      aria-hidden
-                    />
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-baseline gap-1.5">
-                        <code className={cn("font-mono text-[10px] font-bold", palette.text)}>
-                          {t.type}
-                        </code>
-                        <span className="text-muted-foreground text-[10px]">· {t.kind}</span>
-                      </div>
-                      <p className="text-muted-foreground mt-0.5 text-[10.5px] leading-snug">
-                        {t.desc}
-                      </p>
-                    </div>
-                  </li>
-                );
-              })}
-            </ul>
-          </CardContent>
-        </Card>
-
-        {/* ──── 中栏：时间轴 · 真实事件流 ──── */}
-        <Card className="lg:col-span-5">
-          <CardHeader className="p-3">
-            <div className="flex items-baseline justify-between gap-2">
-              <CardTitle className="text-xs">原始事件流（按到达顺序）</CardTitle>
-              <span className="text-muted-foreground font-mono text-[10px]">
-                {rawEvents.length} / 9
-              </span>
-            </div>
-          </CardHeader>
-          <CardContent className="p-3 pt-0">
-            {rawEvents.length === 0 ? (
-              <EmptyHint>
-                点击「开始 AG-UI 流式」→
-                <br />
-                这里会出现 9 个事件的时间轴。
-              </EmptyHint>
-            ) : (
-              <div className="max-h-[36rem] space-y-1 overflow-auto pr-1 scrollbar-thin">
-                {rawEvents.map((evt, i) => {
-                  const ts = i * 200;
-                  return (
-                    <div
-                      // biome-ignore lint/suspicious/noArrayIndexKey: rawEvents is append-only, idx is stable
-                      key={`evt-${evt.type}-${i}`}
-                    >
-                      <TimelineRow
-                        index={i}
-                        timestamp={ts}
-                        eventType={evt.type as AguiEventType}
-                        summary={summarizeEvent(evt, i)}
-                        payload={evt}
-                        isLatest={i === rawEvents.length - 1}
-                        isAnchored={anchoredEventIndex === i}
-                        onSelect={() => handleAnchor(i)}
-                      />
-                    </div>
-                  );
-                })}
+      }
+      outputExtra={
+        <>
+          <span className="text-muted-foreground/70 font-mono text-[10px] tabular-nums">
+            {rawEvents.length} events
+          </span>
+          <span className="text-muted-foreground/40">·</span>
+          <span className="text-muted-foreground/70 font-mono text-[10px] tabular-nums">
+            {chunks.length} chunks
+          </span>
+          <span className="text-muted-foreground/40">·</span>
+          <span className="text-muted-foreground/70 font-mono text-[10px] tabular-nums">
+            {now}ms
+          </span>
+        </>
+      }
+      output={
+        <div className="space-y-4">
+          {/* === 协议流转图 === */}
+          <Card className="bg-card/30 border-foreground/5">
+            <CardHeader className="p-3">
+              <CardTitle className="font-mono text-[11px] tracking-wide uppercase">
+                protocol flow
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="p-3 pt-0">
+              <div className="flex flex-wrap items-center gap-1.5 text-[11px] font-mono">
+                <FlowChip color="emerald" label="RUN_STARTED" />
+                <FlowArrow />
+                <FlowChip color="sky" label="TEXT_MESSAGE_CONTENT" small="×n" />
+                <FlowArrow />
+                <FlowChip color="amber" label="TOOL_CALL_START" />
+                <FlowArrow />
+                <FlowChip color="amber" label="TOOL_CALL_ARGS" small="×n" />
+                <FlowArrow />
+                <FlowChip color="amber" label="TOOL_CALL_END" />
+                <FlowArrow />
+                <FlowChip color="sky" label="TEXT_MESSAGE_CONTENT" small="×n" />
+                <FlowArrow />
+                <FlowChip color="emerald" label="RUN_FINISHED" />
               </div>
-            )}
-          </CardContent>
-        </Card>
+              <p className="text-muted-foreground/70 mt-2 font-mono text-[10.5px]">
+                ↓ 这一组事件流正在本页右下角实时跑 · 点击「开始 AG-UI 流式」观察每个事件单独到达 →
+              </p>
+            </CardContent>
+          </Card>
 
-        {/* ──── 右栏：渲染产物（accumulated text + 工具卡 + 进度） ──── */}
-        <Card className="lg:col-span-4">
-          <CardHeader className="p-3">
-            <div className="flex items-baseline justify-between gap-2">
-              <CardTitle className="text-xs">渲染产物（适配器输出）</CardTitle>
-              <span className="text-muted-foreground font-mono text-[10px]">
-                {chunks.length} RenderableEvent
-              </span>
-            </div>
-          </CardHeader>
-          <CardContent className="p-3 pt-0">
-            {rawEvents.length === 0 ? (
-              <EmptyHint>点击「开始」观察右栏按事件顺序实时填充。</EmptyHint>
-            ) : (
-              <div className="space-y-2">
-                {/* 锚定提示 banner */}
-                {anchoredSummary ? (
-                  <div className="border-primary/40 bg-primary/10 text-primary flex items-center gap-2 rounded-md border px-2.5 py-1.5 text-[10.5px] font-mono">
-                    <MapPin className="size-3 shrink-0" />
-                    <span className="truncate">📍 锚定到 {anchoredSummary}</span>
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant="ghost"
-                      onClick={handleClearAnchor}
-                      className="hover:text-foreground ml-auto h-5 px-1 text-[10px]"
-                    >
-                      <X className="size-3" /> 解除
-                    </Button>
-                  </div>
-                ) : null}
+          {/* === 三栏主视图 === */}
+          <div className="grid grid-cols-1 gap-4 lg:grid-cols-12">
+            {/* ──── 左栏：事件类型字典 ──── */}
+            <Card className="bg-card/30 border-foreground/5 lg:col-span-3">
+              <CardHeader className="p-3">
+                <CardTitle className="font-mono text-[11px] tracking-wide uppercase">
+                  event types
+                  <span className="text-muted-foreground/70 ml-1.5 font-normal">
+                    ({AGUI_EVENT_TYPES.length} / 4 类)
+                  </span>
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="p-3 pt-0">
+                <ul className="space-y-2">
+                  {AGUI_EVENT_TYPES.map((t) => {
+                    const palette = paletteFor(t.color);
+                    return (
+                      <li key={t.type} className="flex items-start gap-2">
+                        <span
+                          className={cn(
+                            "mt-1 size-2 shrink-0 rounded-full ring-2",
+                            palette.dot,
+                            palette.ring,
+                          )}
+                          aria-hidden
+                        />
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-baseline gap-1.5">
+                            <code className={cn("font-mono text-[10px] font-bold", palette.text)}>
+                              {t.type}
+                            </code>
+                            <span className="text-muted-foreground/70 text-[10px]">· {t.kind}</span>
+                          </div>
+                          <p className="text-muted-foreground/85 mt-0.5 text-[10.5px] leading-snug">
+                            {t.desc}
+                          </p>
+                        </div>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </CardContent>
+            </Card>
 
-                {/* 按 rawEvents 顺序逐个渲染 — 与中栏时间轴 1:1 对应 */}
-                {rawEvents.map((evt, i) => {
-                  const anchored = anchoredEventIndex === i;
-                  const onSelect = () => handleAnchor(i);
-                  // 工具块的 3 个事件都映射到 **第一段（START）的 id**，
-                  // 这样中栏点 START/ARGS/END 任意一行都滚到同一张卡
-                  if (evt.type === "TOOL_CALL_START") {
-                    const c = toolCalls[evt.toolCallId];
-                    if (!c) return null;
-                    return (
-                      <ToolBlock
-                        // biome-ignore lint/suspicious/noArrayIndexKey: rawEvents is append-only, idx is stable
-                        key={i}
-                        eventIndex={i}
-                        call={c}
-                        isAnchored={anchored}
-                        onSelect={onSelect}
-                      />
-                    );
-                  }
-                  if (evt.type === "TOOL_CALL_ARGS" || evt.type === "TOOL_CALL_END") {
-                    // 这两段不重复渲染块（已在 START 里展示）；但 id 已经通过 firstIdx 映射到 START 的 DOM 上
-                    return null;
-                  }
-                  if (evt.type === "TEXT_MESSAGE_CONTENT") {
-                    return (
-                      <TextBlock
-                        // biome-ignore lint/suspicious/noArrayIndexKey: rawEvents is append-only, idx is stable
-                        key={i}
-                        eventIndex={i}
-                        text={evt.delta}
-                        isAnchored={anchored}
-                        onSelect={onSelect}
-                      />
-                    );
-                  }
-                  if (evt.type === "STATE_SNAPSHOT" && stateSnapshot) {
-                    return (
-                      <StateBlock
-                        // biome-ignore lint/suspicious/noArrayIndexKey: rawEvents is append-only, idx is stable
-                        key={i}
-                        eventIndex={i}
-                        snapshot={stateSnapshot}
-                        isAnchored={anchored}
-                        onSelect={onSelect}
-                      />
-                    );
-                  }
-                  if (
-                    evt.type === "RUN_STARTED" ||
-                    evt.type === "RUN_FINISHED" ||
-                    evt.type === "RUN_ERROR"
-                  ) {
-                    return (
-                      <ControlBlock
-                        // biome-ignore lint/suspicious/noArrayIndexKey: rawEvents is append-only, idx is stable
-                        key={i}
-                        eventIndex={i}
-                        event={evt}
-                        isAnchored={anchored}
-                        onSelect={onSelect}
-                      />
-                    );
-                  }
-                  // STATE_DELTA / 其他未渲染的事件 —— 占位一个轻量 chip
-                  return (
-                    <button
-                      type="button"
-                      // biome-ignore lint/suspicious/noArrayIndexKey: rawEvents is append-only, idx is stable
-                      key={i}
-                      id={`event-${i}`}
-                      onClick={onSelect}
-                      className={cn(
-                        "border-border bg-muted text-muted-foreground cursor-pointer rounded border px-2.5 py-1 text-left text-[10px] font-mono",
-                        anchored && "ring-2 ring-primary/60 border-primary",
-                      )}
-                    >
-                      {evt.type} · （暂无专属渲染）
-                    </button>
-                  );
-                })}
-
-                <Separator />
-
-                {/* 流式进度（总览统计） */}
-                <div className="space-y-2">
-                  <div className="text-muted-foreground text-[10px] font-mono">
-                    Event kinds · {chunks.length} total
-                  </div>
-                  <KindBar stats={stats} total={chunks.length} />
+            {/* ──── 中栏：时间轴 · 真实事件流 ──── */}
+            <Card className="bg-card/30 border-foreground/5 lg:col-span-5">
+              <CardHeader className="p-3">
+                <div className="flex items-baseline justify-between gap-2">
+                  <CardTitle className="font-mono text-[11px] tracking-wide uppercase">
+                    raw events
+                  </CardTitle>
+                  <span className="text-muted-foreground/70 font-mono text-[10px] tabular-nums">
+                    {rawEvents.length} / {AGUI_EVENT_TYPES.length}
+                  </span>
                 </div>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      </div>
+              </CardHeader>
+              <CardContent className="p-3 pt-0">
+                {rawEvents.length === 0 ? (
+                  <EmptyHint>
+                    点击「开始 AG-UI 流式」→
+                    <br />
+                    这里会出现 9 个事件的时间轴。
+                  </EmptyHint>
+                ) : (
+                  <div className="max-h-[36rem] space-y-1 overflow-auto pr-1 scrollbar-thin">
+                    {rawEvents.map((evt, i) => {
+                      const ts = i * 200;
+                      return (
+                        <div
+                          // biome-ignore lint/suspicious/noArrayIndexKey: rawEvents is append-only, idx is stable
+                          key={`evt-${evt.type}-${i}`}
+                        >
+                          <TimelineRow
+                            index={i}
+                            timestamp={ts}
+                            eventType={evt.type as AguiEventType}
+                            summary={summarizeEvent(evt, i)}
+                            payload={evt}
+                            isLatest={i === rawEvents.length - 1}
+                            isAnchored={anchoredEventIndex === i}
+                            onSelect={() => handleAnchor(i)}
+                          />
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
 
-      {/* === 底部：协议说明 + adapter 流转图 === */}
-      <Card className="mt-4">
-        <CardHeader className="p-4 pb-2">
-          <CardTitle className="text-sm">为什么用 AG-UI？与 Markdown 协议的区别</CardTitle>
-        </CardHeader>
-        <CardContent className="p-4 pt-2">
-          <div className="grid grid-cols-1 gap-3 text-xs md:grid-cols-2">
-            <CompareRow
-              aspect="事件粒度"
-              markdown="每 N 字符一个 text chunk"
-              agui="typed event：text / tool / state / control"
-            />
-            <CompareRow
-              aspect="工具调用"
-              markdown="需要自己用 markdown 解析（如 ```json```）"
-              agui="TOOL_CALL_START / ARGS / END 显式生命周期"
-            />
-            <CompareRow
-              aspect="状态表达"
-              markdown="无（一股脑是文本）"
-              agui="STATE_SNAPSHOT / STATE_DELTA 可独立更新 UI"
-            />
-            <CompareRow
-              aspect="渲染策略"
-              markdown="整个文本框 re-render"
-              agui="按 event type 分发到不同组件"
-            />
+            {/* ──── 右栏：渲染产物 ──── */}
+            <Card className="bg-card/30 border-foreground/5 lg:col-span-4">
+              <CardHeader className="p-3">
+                <div className="flex items-baseline justify-between gap-2">
+                  <CardTitle className="font-mono text-[11px] tracking-wide uppercase">
+                    rendered output
+                  </CardTitle>
+                  <span className="text-muted-foreground/70 font-mono text-[10px] tabular-nums">
+                    {chunks.length} chunks
+                  </span>
+                </div>
+              </CardHeader>
+              <CardContent className="p-3 pt-0">
+                {rawEvents.length === 0 ? (
+                  <EmptyHint>点击「开始」观察右栏按事件顺序实时填充。</EmptyHint>
+                ) : (
+                  <div className="space-y-2">
+                    {anchoredSummary ? (
+                      <div className="border-primary/40 bg-primary/10 text-primary flex items-center gap-2 rounded-md border px-2.5 py-1.5 font-mono text-[10.5px]">
+                        <MapPin className="size-3 shrink-0" />
+                        <span className="truncate">📍 锚定到 {anchoredSummary}</span>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="ghost"
+                          onClick={handleClearAnchor}
+                          className="hover:text-foreground ml-auto h-5 px-1 text-[10px]"
+                        >
+                          <X className="size-3" /> 解除
+                        </Button>
+                      </div>
+                    ) : null}
+
+                    {rawEvents.map((evt, i) => {
+                      const anchored = anchoredEventIndex === i;
+                      const onSelect = () => handleAnchor(i);
+                      if (evt.type === "TOOL_CALL_START") {
+                        const c = toolCalls[evt.toolCallId];
+                        if (!c) return null;
+                        return (
+                          <ToolBlock
+                            // biome-ignore lint/suspicious/noArrayIndexKey: rawEvents is append-only, idx is stable
+                            key={i}
+                            eventIndex={i}
+                            call={c}
+                            isAnchored={anchored}
+                            onSelect={onSelect}
+                          />
+                        );
+                      }
+                      if (evt.type === "TOOL_CALL_ARGS" || evt.type === "TOOL_CALL_END") {
+                        return null;
+                      }
+                      if (evt.type === "TEXT_MESSAGE_CONTENT") {
+                        return (
+                          <TextBlock
+                            // biome-ignore lint/suspicious/noArrayIndexKey: rawEvents is append-only, idx is stable
+                            key={i}
+                            eventIndex={i}
+                            text={evt.delta}
+                            isAnchored={anchored}
+                            onSelect={onSelect}
+                          />
+                        );
+                      }
+                      if (evt.type === "STATE_SNAPSHOT" && stateSnapshot) {
+                        return (
+                          <StateBlock
+                            // biome-ignore lint/suspicious/noArrayIndexKey: rawEvents is append-only, idx is stable
+                            key={i}
+                            eventIndex={i}
+                            snapshot={stateSnapshot}
+                            isAnchored={anchored}
+                            onSelect={onSelect}
+                          />
+                        );
+                      }
+                      if (
+                        evt.type === "RUN_STARTED" ||
+                        evt.type === "RUN_FINISHED" ||
+                        evt.type === "RUN_ERROR"
+                      ) {
+                        return (
+                          <ControlBlock
+                            // biome-ignore lint/suspicious/noArrayIndexKey: rawEvents is append-only, idx is stable
+                            key={i}
+                            eventIndex={i}
+                            event={evt}
+                            isAnchored={anchored}
+                            onSelect={onSelect}
+                          />
+                        );
+                      }
+                      return (
+                        <button
+                          type="button"
+                          // biome-ignore lint/suspicious/noArrayIndexKey: rawEvents is append-only, idx is stable
+                          key={i}
+                          id={`event-${i}`}
+                          onClick={onSelect}
+                          className={cn(
+                            "border-border bg-muted text-muted-foreground cursor-pointer rounded border px-2.5 py-1 text-left font-mono text-[10px]",
+                            anchored && "ring-2 ring-primary/60 border-primary",
+                          )}
+                        >
+                          {evt.type} · （暂无专属渲染）
+                        </button>
+                      );
+                    })}
+
+                    <Separator />
+
+                    <div className="space-y-2">
+                      <div className="text-muted-foreground/70 font-mono text-[10px]">
+                        Event kinds · {chunks.length} total
+                      </div>
+                      <KindBar stats={stats} total={chunks.length} />
+                    </div>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
           </div>
-        </CardContent>
-      </Card>
-    </div>
+
+          {/* === 协议对照说明 === */}
+          <Card className="bg-card/30 border-foreground/5">
+            <CardHeader className="p-3">
+              <CardTitle className="font-mono text-[11px] tracking-wide uppercase">
+                why ag-ui? · vs markdown protocol
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="p-3 pt-0">
+              <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                <CompareRow
+                  aspect="事件粒度"
+                  markdown="每 N 字符一个 text chunk"
+                  agui="typed event：text / tool / state / control"
+                />
+                <CompareRow
+                  aspect="工具调用"
+                  markdown="需要自己用 markdown 解析（如 ```json```）"
+                  agui="TOOL_CALL_START / ARGS / END 显式生命周期"
+                />
+                <CompareRow
+                  aspect="状态表达"
+                  markdown="无（一股脑是文本）"
+                  agui="STATE_SNAPSHOT / STATE_DELTA 可独立更新 UI"
+                />
+                <CompareRow
+                  aspect="渲染策略"
+                  markdown="整个文本框 re-render"
+                  agui="按 event type 分发到不同组件"
+                />
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      }
+    />
   );
 }
 

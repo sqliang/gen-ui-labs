@@ -1,12 +1,27 @@
 "use client";
 
 import { useState } from "react";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+
+import { LabContentPage } from "@/components/lab-content-page";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { type A2uiComponentNode, type A2uiEvent, a2uiAdapter } from "@/core/protocols/a2ui/mapper";
 import { useStreamingStore } from "@/core/state/streaming-store";
 import { fetchSse } from "@/infra/http/sse-client";
+
+function eventKey(e: A2uiEvent, fallback: string): string {
+  if (e.type === "dataModelUpdate") {
+    return `evt-${e.type}-${e.path}-${fallback}`;
+  }
+  return `evt-${e.type}-${e.surfaceId}-${fallback}`;
+}
+
+function chunkKey(c: import("@/core/protocols/common/types").RenderableEvent, i: number): string {
+  if (c.kind === "text") return `chunk-text-${c.path ?? "x"}-${i}`;
+  if (c.kind === "component") return `chunk-comp-${c.id}-${i}`;
+  if (c.kind === "state") return `chunk-state-${c.path}-${i}`;
+  if (c.kind === "tool") return `chunk-tool-${c.name}-${i}`;
+  return `chunk-ctrl-${c.type}-${i}`;
+}
 
 export default function A2uiPage() {
   const { chunks, isStreaming, start, append, finish, reset } = useStreamingStore();
@@ -55,130 +70,137 @@ export default function A2uiPage() {
   };
 
   return (
-    <div className="mx-auto w-full max-w-6xl px-6 py-8">
-      <header className="mb-4">
-        <div className="flex flex-wrap items-center gap-2">
-          <h1 className="text-xl font-bold tracking-tight">1.1.3 A2UI 协议流式</h1>
-          <Badge variant="outline">W5 · A2UI v0.2</Badge>
-          {isStreaming ? (
-            <Badge variant="default" className="font-mono text-[10px]">
-              streaming…
-            </Badge>
-          ) : null}
+    <LabContentPage
+      labId="streaming"
+      subNumber="1.1.3"
+      title="A2UI 协议流式"
+      protocolLabel="W5 · A2UI v0.2"
+      description="A2UI v0.2 用 surfaceUpdate 声明组件树 + dataModelUpdate 增量更新数据 → 通过 a2uiAdapter 转为 RenderableEvent 走统一渲染管道。"
+      isStreaming={isStreaming}
+      errorMsg={errorMsg}
+      onStart={handleStart}
+      onReset={reset}
+      onStop={() => finish()}
+      startLabel="开始 A2UI 流式"
+      outputTitle="a2ui · surface inspector"
+      outputEmpty={rawEvents.length === 0 && componentTree.length === 0}
+      outputEmptyHint={
+        <div className="text-muted-foreground/70 py-10 text-center font-mono text-[12px]">
+          点击「开始 A2UI 流式」→
+          <br />
+          下方会出现 surfaceUpdate / dataModelUpdate 流和对应组件树
         </div>
-        <p className="text-muted-foreground mt-1 text-sm">
-          surfaceUpdate + dataModelUpdate → a2uiAdapter → RenderableEvent → 组件树
-        </p>
-      </header>
+      }
+      outputExtra={
+        <>
+          <span className="text-muted-foreground/70 font-mono text-[10px] tabular-nums">
+            {rawEvents.length} events
+          </span>
+          <span className="text-muted-foreground/40">·</span>
+          <span className="text-muted-foreground/70 font-mono text-[10px] tabular-nums">
+            {componentTree.length} nodes
+          </span>
+          <span className="text-muted-foreground/40">·</span>
+          <span className="text-muted-foreground/70 font-mono text-[10px] tabular-nums">
+            {chunks.length} chunks
+          </span>
+        </>
+      }
+      output={
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+          <Card className="bg-card/30 border-foreground/5">
+            <CardHeader className="p-3">
+              <CardTitle className="font-mono text-[11px] tracking-wide uppercase">
+                raw a2ui events
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="p-3 pt-0">
+              <pre className="bg-[#0d1117] border-foreground/10 max-h-[28rem] overflow-auto rounded-md border p-3 font-mono text-[10px] leading-relaxed text-foreground/85">
+                {rawEvents.length > 0
+                  ? rawEvents.map((e, i) => (
+                      <div
+                        key={eventKey(e, String(i))}
+                        className="border-foreground/10 border-b pb-1 mb-1 last:border-0"
+                      >
+                        <span className="font-bold text-emerald-300">{e.type}</span>
+                        {"\n"}
+                        <span className="text-muted-foreground">{JSON.stringify(e, null, 1)}</span>
+                      </div>
+                    ))
+                  : "点击「开始」"}
+              </pre>
+            </CardContent>
+          </Card>
 
-      <div className="mb-4 flex gap-2">
-        <Button onClick={handleStart} disabled={isStreaming}>
-          {isStreaming ? "流式中…" : "开始 A2UI 流式"}
-        </Button>
-        <Button onClick={reset} variant="ghost" disabled={isStreaming}>
-          清空
-        </Button>
-      </div>
+          <Card className="bg-card/30 border-foreground/5">
+            <CardHeader className="p-3">
+              <CardTitle className="font-mono text-[11px] tracking-wide uppercase">
+                component tree
+                <span className="text-muted-foreground/70 ml-1.5 font-normal">
+                  ({componentTree.length} 节点)
+                </span>
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="p-3 pt-0">
+              <div className="max-h-[28rem] overflow-auto rounded">
+                {componentTree.length > 0
+                  ? componentTree.map((node) => (
+                      <Card key={node.id} className="bg-card/30 border-foreground/10 mb-2">
+                        <CardHeader className="p-2">
+                          <CardTitle className="text-[11px]">
+                            <span className="font-bold text-emerald-300">{node.component}</span>
+                            <span className="text-muted-foreground/70 ml-1 font-mono text-[9px]">
+                              id:{node.id}
+                            </span>
+                          </CardTitle>
+                        </CardHeader>
+                        <CardContent className="p-2 pt-0">
+                          {node.props ? (
+                            <pre className="text-muted-foreground/85 font-mono text-[10px]">
+                              {JSON.stringify(node.props, null, 2)}
+                            </pre>
+                          ) : null}
+                          {node.children ? (
+                            <p className="text-muted-foreground/70 mt-1 font-mono text-[10px]">
+                              children: [{node.children.join(", ")}]
+                            </p>
+                          ) : null}
+                        </CardContent>
+                      </Card>
+                    ))
+                  : "点击「开始」"}
+              </div>
+            </CardContent>
+          </Card>
 
-      {errorMsg ? (
-        <Card className="mb-4 border-destructive/50">
-          <CardContent className="p-3 text-destructive text-sm">
-            <strong>错误：</strong>
-            {errorMsg}
-          </CardContent>
-        </Card>
-      ) : null}
-
-      <div className="grid grid-cols-3 gap-4">
-        {/* 左：原始 A2UI 事件 */}
-        <Card>
-          <CardHeader className="p-3">
-            <CardTitle className="text-xs">A2UI 原始事件</CardTitle>
-          </CardHeader>
-          <CardContent className="p-3 pt-0">
-            <pre className="bg-muted max-h-[28rem] overflow-auto rounded p-2 font-mono text-[10px] leading-relaxed">
-              {rawEvents.length > 0
-                ? rawEvents.map((e, i) => (
-                    // biome-ignore lint/suspicious/noArrayIndexKey: static mock list
-                    <div key={`raw-${i}`} className="border-muted border-b pb-1 mb-1">
-                      <span className="text-primary font-bold">{e.type}</span>
-                      {"\n"}
-                      {JSON.stringify(e, null, 1)}
-                    </div>
-                  ))
-                : "点击「开始」"}
-            </pre>
-          </CardContent>
-        </Card>
-
-        {/* 中：组件树 */}
-        <Card>
-          <CardHeader className="p-3">
-            <CardTitle className="text-xs">
-              组件树
-              <span className="text-muted-foreground ml-1 font-normal">
-                ({componentTree.length} 节点)
-              </span>
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="p-3 pt-0">
-            <div className="max-h-[28rem] overflow-auto rounded">
-              {componentTree.length > 0
-                ? componentTree.map((node) => (
-                    <Card key={node.id} className="mb-2 border-muted">
-                      <CardHeader className="p-2">
-                        <CardTitle className="text-[11px]">
-                          <span className="text-primary font-bold">{node.component}</span>
-                          <span className="text-muted-foreground ml-1 font-mono text-[9px]">
-                            id:{node.id}
-                          </span>
-                        </CardTitle>
-                      </CardHeader>
-                      <CardContent className="p-2 pt-0">
-                        {node.props ? (
-                          <pre className="text-muted-foreground text-[10px]">
-                            {JSON.stringify(node.props, null, 2)}
-                          </pre>
-                        ) : null}
-                        {node.children ? (
-                          <p className="text-muted-foreground mt-1 text-[10px]">
-                            children: [{node.children.join(", ")}]
-                          </p>
-                        ) : null}
-                      </CardContent>
-                    </Card>
-                  ))
-                : "点击「开始」"}
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* 右：RenderableEvent */}
-        <Card>
-          <CardHeader className="p-3">
-            <CardTitle className="text-xs">
-              RenderableEvent
-              <span className="text-muted-foreground ml-1 font-normal">
-                ({chunks.length} chunks)
-              </span>
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="p-3 pt-0">
-            <pre className="bg-muted max-h-[28rem] overflow-auto rounded p-2 font-mono text-[10px] leading-relaxed">
-              {chunks.length > 0
-                ? chunks.map((c, i) => (
-                    // biome-ignore lint/suspicious/noArrayIndexKey: append-only chunks
-                    <div key={`re-${i}`} className="border-muted border-b pb-1 mb-1">
-                      <span className="text-primary font-bold">{c.kind}</span>
-                      {"\n"}
-                      {JSON.stringify(c, null, 1)}
-                    </div>
-                  ))
-                : "点击「开始」"}
-            </pre>
-          </CardContent>
-        </Card>
-      </div>
-    </div>
+          <Card className="bg-card/30 border-foreground/5">
+            <CardHeader className="p-3">
+              <CardTitle className="font-mono text-[11px] tracking-wide uppercase">
+                renderable event
+                <span className="text-muted-foreground/70 ml-1.5 font-normal">
+                  ({chunks.length} chunks)
+                </span>
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="p-3 pt-0">
+              <pre className="bg-[#0d1117] border-foreground/10 max-h-[28rem] overflow-auto rounded-md border p-3 font-mono text-[10px] leading-relaxed text-foreground/85">
+                {chunks.length > 0
+                  ? chunks.map((c, i) => (
+                      <div
+                        key={chunkKey(c, i)}
+                        className="border-foreground/10 border-b pb-1 mb-1 last:border-0"
+                      >
+                        <span className="font-bold text-sky-300">{c.kind}</span>
+                        {"\n"}
+                        <span className="text-muted-foreground">{JSON.stringify(c, null, 1)}</span>
+                      </div>
+                    ))
+                  : "点击「开始」"}
+              </pre>
+            </CardContent>
+          </Card>
+        </div>
+      }
+    />
   );
 }
