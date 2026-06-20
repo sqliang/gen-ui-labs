@@ -86,6 +86,19 @@ const MOCK_PATCHES: JsonUiPatch[] = [
     op: "mount",
     path: "/root/children/2",
     value: {
+      type: "chart",
+      props: {
+        title: "W1–W12 节奏",
+        type: "bar",
+        labels: ["W1", "W2", "W3", "W4", "W5", "W6", "W7", "W8", "W9", "W10", "W11", "W12"],
+        values: [1, 1, 1, 1, 0.6, 0.4, 0, 0, 0, 0, 0, 0],
+      },
+    },
+  },
+  {
+    op: "mount",
+    path: "/root/children/3",
+    value: {
       type: "text",
       props: {
         content:

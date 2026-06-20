@@ -281,25 +281,43 @@ function mockTextFor(prompt: string): string {
   }
   if (/ag-ui/i.test(prompt)) {
     return [
-      "## AG-UI 协议 placeholder",
+      "## AG-UI 协议",
       "",
-      "W4-3 会在 `core/protocols/common/` 落地 AG-UI 事件流（`TEXT_MESSAGE_CONTENT` / `TOOL_CALL_START` 等）。",
+      "**W4 落地**：typed event 流（`TEXT_MESSAGE_CONTENT` / `TOOL_CALL_START` / `STATE_DELTA`）。",
+      "切换到 **api** + `deepseek-chat` 试真流 →",
       "",
-      "Markdown 协议 ≠ AG-UI 协议；本页是 Markdown 协议专属。",
+      "```ts",
+      "aguiAdapter.adapt(rawEvent) → RenderableEvent",
+      "// 然后 streaming-store.append(chunks)",
+      "```",
+      "",
+      "完整 demo 见 **1.1.2 AG-UI 协议流式**。",
     ].join("\n");
   }
   if (/a2ui/i.test(prompt)) {
     return [
-      "## A2UI 协议 placeholder",
+      "## A2UI 协议",
       "",
-      "W4-3 接入 A2UI v0.2 规范的 `surfaceUpdate` / `dataModelUpdate`。",
+      "**W5 落地**：`surfaceUpdate` 声明组件树 + `dataModelUpdate` 增量更新数据。",
+      "",
+      "- A2UI v0.2 规范解析",
+      "- `a2uiAdapter` 映射到 RenderableEvent",
+      "- `/api/a2ui` mock SSE 端点",
+      "",
+      "完整 demo 见 **1.1.3 A2UI 协议流式**。",
     ].join("\n");
   }
   if (/json-ui|dsl/i.test(prompt)) {
     return [
-      "## JSON-UI DSL placeholder",
+      "## JSON-UI DSL",
       "",
-      "W6 落地 JSON-UI → React 引擎（`core/engine/json-ui/`）。",
+      "**W6 落地**：声明式 JSON 树 → React 递归渲染。",
+      "",
+      "- 8 类节点（card / table / button / text / flex / grid / chart / input）",
+      "- `/api/json-ui` SSE patch 流",
+      "- `JsonUiRenderer` 在 **2.1.2 JSON-UI DSL** 完整可跑",
+      "",
+      "切到 **api** 模式可看增量 build 过程。",
     ].join("\n");
   }
   return [

@@ -5,6 +5,7 @@ import { LabCard } from "@/components/home/lab-card";
 import { LiveTokenStream } from "@/components/home/live-token-stream";
 import { Button } from "@/components/ui/button";
 import { LABS } from "@/core/labs";
+import { BUILTIN_MODELS } from "@/core/models/registry";
 
 // 最近会话 —— W9 接入 IndexedDB。这里写成"看起来像真的"的 mock
 const RECENT_SESSIONS = [
@@ -50,12 +51,18 @@ const RECENT_SESSIONS = [
   },
 ];
 
+// 站点级数据 —— 自动从 registry 派生，避免和 core 数据双写
+const PROVIDER_COUNT = new Set(BUILTIN_MODELS.map((m) => m.provider)).size;
 const STATS = [
-  { label: "labs", value: "4", hint: "并行实验区" },
-  { label: "models", value: "13", hint: "6 个 provider" },
+  { label: "labs", value: String(LABS.length), hint: "并行实验区" },
+  {
+    label: "models",
+    value: String(BUILTIN_MODELS.length),
+    hint: `${PROVIDER_COUNT} 个 provider`,
+  },
   { label: "tests", value: "68", hint: "vitest · green" },
   { label: "scenarios", value: "5", hint: "long · tools · error · reconnect · default" },
-];
+] as const;
 
 export default function HomePage() {
   return (

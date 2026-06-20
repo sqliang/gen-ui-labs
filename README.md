@@ -81,7 +81,7 @@ src/
 │   └─ session/            # 会话与回放（占位，W9 落地）
 │
 ├─ features/               # 按 Lab 拆的功能模块（占位）
-├─ views/                  # 页面级 UI 编排（lab-sidebar / lab-topbar / lab-overview）
+├─ views/                  # 页面级 UI 编排（lab-sidebar + URL↔store 同步）
 ├─ infra/                  # 工具/网络/存储（占位）
 └─ lib/                    # 工具函数（cn / formatDate / shortId 等）
 ```
