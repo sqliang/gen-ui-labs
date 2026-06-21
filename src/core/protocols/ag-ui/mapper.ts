@@ -149,3 +149,124 @@ export const aguiAdapter: ProtocolAdapter<AguiEvent> = {
     return events.map((e) => this.adapt(e));
   },
 };
+
+// ===== 有状态 adapter（合并 tool call lifecycle） =====
+
+/**
+ * 跟 stateless aguiAdapter 的区别：
+ * - TOOL_CALL_START 单独 output（带 id）
+ * - TOOL_CALL_ARGS 累积 args delta，**到 TOOL_CALL_END 才一次性 emit 一个合并的 tool chunk**
+ * - 中间不丢 name（ARGS 没有 name）
+ * - STATE_DELTA 累积所有 patch 到一个 state chunk
+ *
+ * 用法：streamed 流式消费时，对每个新事件调 `stateful.adapt(event)`，
+ * 返回所有"应该发到下游"的 RenderableEvent（可能 0/1/2 个）。
+ */
+export interface StatefulProtocolAdapter<TExternalEvent = unknown> {
+  readonly protocol: "ag-ui";
+  adapt(event: TExternalEvent): RenderableEvent[];
+  /** 重置（开始新一次 run） */
+  reset(): void;
+}
+
+export function createAguiStatefulAdapter(): StatefulProtocolAdapter<AguiEvent> {
+  // toolCallId → { name, argsBuffer }
+  const toolCalls = new Map<string, { name: string; argsBuffer: string }>();
+  // 全局 state 累积
+  const stateBuffer: Array<{ op: string; path: string; value?: unknown }> = [];
+
+  return {
+    protocol: "ag-ui",
+
+    adapt(event: AguiEvent): RenderableEvent[] {
+      const out: RenderableEvent[] = [];
+      switch (event.type) {
+        case "TEXT_MESSAGE_CONTENT":
+          out.push({ kind: "text", delta: event.delta });
+          break;
+
+        case "TOOL_CALL_START":
+          toolCalls.set(event.toolCallId, {
+            name: event.toolCallName,
+            argsBuffer: "",
+          });
+          // 先 emit 一个"开始"meta，下游可订阅 tool_started 事件
+          out.push({
+            kind: "control",
+            type: "meta",
+            meta: { toolStarted: event.toolCallId, name: event.toolCallName },
+          });
+          break;
+
+        case "TOOL_CALL_ARGS": {
+          const tc = toolCalls.get(event.toolCallId);
+          if (tc) tc.argsBuffer += event.delta;
+          break;
+        }
+
+        case "TOOL_CALL_END": {
+          const tc = toolCalls.get(event.toolCallId);
+          if (!tc) break;
+          let parsedArgs: unknown = {};
+          try {
+            parsedArgs = JSON.parse(tc.argsBuffer);
+          } catch {
+            // args 不完整时塞原始 buffer 让调用方处理
+            parsedArgs = { _raw: tc.argsBuffer };
+          }
+          out.push({
+            kind: "tool",
+            name: tc.name,
+            args: parsedArgs,
+            id: event.toolCallId,
+          });
+          toolCalls.delete(event.toolCallId);
+          break;
+        }
+
+        case "STATE_SNAPSHOT":
+          // SNAPSHOT 是"全量"，覆盖 buffer
+          stateBuffer.length = 0;
+          for (const [path, value] of Object.entries(event.snapshot)) {
+            stateBuffer.push({ op: "replace", path, value });
+          }
+          out.push({ kind: "state", path: "/", value: event.snapshot });
+          break;
+
+        case "STATE_DELTA":
+          // 累积 patch，emit 一个累计 state chunk
+          for (const patch of event.delta) {
+            stateBuffer.push(patch);
+          }
+          out.push({
+            kind: "state",
+            path: "/__delta__",
+            value: stateBuffer.slice(),
+          });
+          break;
+
+        case "RUN_STARTED":
+          out.push({ kind: "control", type: "start" });
+          break;
+
+        case "RUN_FINISHED":
+          out.push({ kind: "control", type: "end" });
+          break;
+
+        case "RUN_ERROR":
+          out.push({
+            kind: "control",
+            type: "error",
+            meta: { message: event.message, code: event.code },
+          });
+          break;
+      }
+      return out;
+    },
+
+    reset(): void {
+      toolCalls.clear();
+      stateBuffer.length = 0;
+    },
+  };
+}

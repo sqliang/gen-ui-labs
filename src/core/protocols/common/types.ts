@@ -55,6 +55,8 @@ export interface ToolChunk {
   args: unknown;
   /** 工具结果（仅在 result 阶段出现） */
   result?: unknown;
+  /** 同一 toolCall 的关联 id（AG-UI 协议层面需要） */
+  id?: string;
 }
 
 /** 控制事件（所有协议共用：start / end / error / meta） */
@@ -68,6 +70,34 @@ export interface ControlChunk {
 
 /** 协议无关的渲染事件 —— 所有 provider.stream() 的产出 */
 export type RenderableEvent = TextChunk | ComponentChunk | StateChunk | ToolChunk | ControlChunk;
+
+// ===== Lifecycle 增强（可选） =====
+
+/**
+ * 加了 lifecycle 元数据的 RenderableEvent。
+ *
+ * seq/ts/sessionId 是 Lab 4 可观测性（observability）的硬需求：
+ * - seq：同一 run 内的严格单调递增序号；用于 replay 按序回放
+ * - ts：事件发出的服务端时间戳（ms since epoch）；用于 latency 分析
+ * - sessionId：唯一标识一次 run，用于"为什么这一段比那段慢"对比
+ * - source：事件来源（mock/api/streamed）；用于过滤和归因
+ *
+ * mapper 输出的是 plain RenderableEvent；enrichEvent() 工具函数负责包装。
+ */
+export interface EventMeta {
+  /** run 内序号（从 0 起） */
+  seq: number;
+  /** 事件发出时间戳（ms since epoch） */
+  ts: number;
+  /** run 唯一标识（hash of model + prompt + startTime） */
+  sessionId: string;
+  /** 事件来源 */
+  source: "mock" | "api" | "streamed";
+}
+
+export type EnrichedRenderableEvent = RenderableEvent & {
+  _meta: EventMeta;
+};
 
 // ===== 协议适配器接口 =====
 
