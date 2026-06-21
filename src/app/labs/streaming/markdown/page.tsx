@@ -17,6 +17,8 @@ import { useObservabilityStore } from "@/core/state/observability-store";
 import { useSessionStore } from "@/core/state/session-store";
 import { useStreamingStore } from "@/core/state/streaming-store";
 import { fetchSse } from "@/infra/http/sse-client";
+import { useLabActions } from "@/lib/use-lab-actions";
+import { useLogSession } from "@/lib/use-log-session";
 
 /** 数据源：mock（本地 setTimeout）/ api（真 /api/chat SSE） */
 type StreamSource = "mock" | "api";
@@ -136,12 +138,15 @@ export default function MarkdownStreamingPage() {
   const handleStart = async () => {
     const prompt = customPrompt.trim() || activePreset || "";
     if (!prompt) return;
+    markStart();
     reset();
     setErrorMsg(null);
     if (source === "mock") {
       await runMock(prompt);
+      logSession();
     } else {
       await runApi(prompt);
+      logSession();
     }
   };
 
@@ -150,9 +155,21 @@ export default function MarkdownStreamingPage() {
     finish();
   };
 
+  // ⌘K action 监听：run / stop / reset
+  useLabActions({ onStart: handleStart, onStop: handleStop, onReset: reset });
+
   const charCount = accumulatedText.length;
   const chunkCount = chunks.length;
   const firstTokenLatency = extractMetricsFromChunks(chunks).firstTokenLatencyMs;
+
+  // session 完成后写入 sessionsLog（首页会实时更新）
+  const { markStart, logSession } = useLogSession({
+    lab: "streaming",
+    protocol: "MD",
+    getTitle: () => `Markdown · ${(activePreset || customPrompt || "react demo").slice(0, 30)}`,
+    getTokens: () => Math.ceil(charCount / 4),
+    getModel: () => currentModelId,
+  });
 
   const toolbar = (
     <div className="space-y-3 rounded-xl border border-foreground/[0.06] bg-foreground/[0.02] p-4">

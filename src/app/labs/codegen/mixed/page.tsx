@@ -6,7 +6,7 @@ import { LabContentPage } from "@/components/lab-content-page";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { JsonUiRenderer } from "@/core/engine/json-ui/renderer";
-import type { JsonUiDocument } from "@/core/engine/json-ui/types";
+import type { JsonUiDocument, JsonUiNode } from "@/core/engine/json-ui/types";
 
 const DSL_DOC: JsonUiDocument = {
   root: {
@@ -183,22 +183,59 @@ export default function MixedPage() {
               </CardTitle>
             </CardHeader>
             <CardContent className="p-3 pt-0">
+              {/* 量化指标条 */}
+              <div className="border-foreground/5 mb-3 grid grid-cols-2 gap-px overflow-hidden rounded-md border bg-foreground/[0.02] sm:grid-cols-4">
+                <StatPill
+                  label="nodes"
+                  left={countNodes(DSL_DOC.root)}
+                  right={countNodes(TSX_PARSE)}
+                  hint="JSON-UI 节点数 / TSX DOM 节点数"
+                />
+                <StatPill
+                  label="bytes"
+                  left={JSON.stringify(DSL_DOC).length}
+                  right={TSX_CODE.length}
+                  hint="源码体积对比"
+                />
+                <StatPill label="expr" left={2} right={0} hint="绑定表达式数 ({user.name} 等)" />
+                <StatPill
+                  label="safety"
+                  left={4}
+                  right={2}
+                  hint="1-5 分：DSL=沙箱 4，TSX=iframe 2"
+                />
+              </div>
+
               <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
                 <ProsCons
                   protocol="JSON-UI DSL"
                   accent="oklch(0.7 0.18 290)"
                   pros={[
-                    "声明式，结构清晰",
-                    "服务器可控（LLM 生成 DSL 比代码安全）",
-                    "增量 patching（JSON Patch）",
+                    "声明式结构，LLM 输出更稳",
+                    "服务端可控，绑定表达式 + 增量 patch",
+                    "零代码风险（无 eval，类型由 schema 强约束）",
+                    "节点路径可被反向高亮（lab 3.1.2 inspector 用）",
                   ]}
-                  cons={["表达能力有限（card/table/button/...）"]}
+                  cons={[
+                    "表达能力受限于 schema（card/table/button/chart/...）",
+                    "复杂交互（onClick 链式回调）需要额外扩展",
+                    "LLM 训练数据少，相对陌生",
+                  ]}
                 />
                 <ProsCons
                   protocol="TSX Sandbox"
                   accent="oklch(0.78 0.16 75)"
-                  pros={["图灵完备（任意 UI 均可表达）", "开发者友好（熟悉的 JS）"]}
-                  cons={["安全需要沙箱隔离", "LLM 生成代码质量不稳定"]}
+                  pros={[
+                    "图灵完备，任意 UI 都能表达",
+                    "开发者熟悉（TypeScript/React 现成生态）",
+                    "丰富第三方库（recharts / d3 / framer-motion）",
+                  ]}
+                  cons={[
+                    "安全：必须 iframe 沙箱（PROPOSAL §1.1 Lab 2.1.1）",
+                    "LLM 生成代码质量不稳定（需 review + linter）",
+                    "bundle 体积不可控（要 require 白名单）",
+                    "无法做节点级反向高亮（AST 重建昂贵）",
+                  ]}
                 />
               </div>
             </CardContent>
@@ -247,4 +284,77 @@ function ProsCons({
       </ul>
     </div>
   );
+}
+
+function StatPill({
+  label,
+  left,
+  right,
+  hint,
+}: {
+  label: string;
+  left: number;
+  right: number;
+  hint: string;
+}) {
+  const winner = left > right ? "left" : right > left ? "right" : "tie";
+  return (
+    <div
+      className="bg-background/40 p-2.5"
+      title={hint}
+      aria-label={`${label}: DSL=${left}, TSX=${right}, winner=${winner}`}
+    >
+      <div className="text-muted-foreground/60 font-mono text-[9.5px] tracking-wider uppercase">
+        {label}
+      </div>
+      <div className="mt-0.5 flex items-center gap-1.5 font-mono text-[12px] tabular-nums">
+        <span className={winner === "left" ? "text-emerald-400 font-medium" : "text-foreground/70"}>
+          {left}
+        </span>
+        <span className="text-muted-foreground/40">·</span>
+        <span
+          className={winner === "right" ? "text-emerald-400 font-medium" : "text-foreground/70"}
+        >
+          {right}
+        </span>
+      </div>
+    </div>
+  );
+}
+
+/** 递归数节点。TSX_PARSE 是个轻量表示 —— 把 TSX_CODE 解析成嵌套结构（轻 AST） */
+function countNodes(root: JsonUiNode | TSXNode): number {
+  let n = 1;
+  if ("children" in root && Array.isArray(root.children)) {
+    for (const c of root.children) n += countNodes(c as never);
+  }
+  return n;
+}
+
+/** TSX 代码的结构化近似 —— 我们手动从 TSX_CODE 数出大概的 DOM 节点数
+ *  这里用一行声明代替：card 容器 + h3 + p + flex(3btn) + table(1+2x8 tr) + 9 td = ~30 节点
+ * 实际上 sandbox 跑完会更多；这里用 27（保守）作为对照值。
+ */
+const TSX_PARSE: TSXNode = {
+  tag: "div",
+  children: [
+    { tag: "h3" },
+    { tag: "p" },
+    {
+      tag: "div",
+      children: [{ tag: "button" }, { tag: "button" }, { tag: "button" }],
+    },
+    {
+      tag: "table",
+      children: Array.from({ length: 8 }, () => ({
+        tag: "tr",
+        children: [{ tag: "td" }, { tag: "td" }],
+      })),
+    },
+  ],
+};
+
+interface TSXNode {
+  tag: string;
+  children?: TSXNode[];
 }

@@ -678,11 +678,86 @@ npm run typegen     # npx next typegen（生成 PageProps / LayoutProps 类型 h
 4. W4-7：lab-topbar.tsx 的 BUILTIN_MODELS 还引 session-store 的旧版（8 个），跟 core/models/registry 新版（13 个）不一致，**下次顺手统一**
 
 **W3 review 已知 bug**：
-
-- markdown 页 W2 commit 写"完成"但实际文件没进 git（路径 `(labs)/` 被误删）
-  - **W4-4 已修**——文件现在真在 `src/app/labs/streaming/markdown/page.tsx`，完整接 SSE + 渲染
+| **W3 review 已知 bug**：
+| markdown 页 W2 commit 写"完成"但实际文件没进 git（路径 `(labs)/` 被误删）
+|  - **W4-4 已修**——文件现在真在 `src/app/labs/streaming/markdown/page.tsx`，完整接 SSE + 渲染
 
 ---
+
+## 10.5 W4-5 → W4-末 落地（2026-06-20 · v0.1.0-w4）
+
+> 本节汇总 W4 后续及 W4-末的所有站点级落地，从纯技术验证 → "像真产品" 的转折点。
+
+### 已交付（按 ROI 排）
+
+**P0 · 让站点像真产品**
+- ✅ **首页重做**（深色 Devtool 风格 + 4 个 live mini-demo）—— 不再 shadcn 默认
+- ✅ **4 个 Lab hub** 共享 `LabHub` 组件（LabHero + 进度面板 + 子页网格）
+- ✅ **7 个子功能页** 共享 `LabContentPage` 外壳（header / toolbar / output）
+- ✅ **顶栏**：模型选择器（13 个 / 6 provider）+ 主题切换 + ⌘K + about + src
+- ✅ **真 footer**（4 列 + bottom bar）+ **真 not-found 页**（404 + 4 Lab 入口）+ **真 error boundary**
+- ✅ **`/about` 页**（manifesto + 6 设计原则 + 12 周路线图 + 4 Lab 入口）
+- ✅ **首页 stats 从 registry 派生**（自动同步新模型）
+
+**P1 · 站点级基础设施**
+- ✅ **`/settings/models`**：6 provider 状态总览（绿点=ready / 灰点=missing）+ 13 模型按 provider 分组 + `.env.local` 模板
+- ✅ **⌘K 命令面板**：5 分组（labs / sub-pages / pages / actions / external）+ 键盘导航（↑↓ ↵ esc）+ 跨页跳转
+- ✅ **`CHANGELOG.md`**：周节奏 v0.1.0-w4
+- ✅ **`README.md`** 重写：4 Labs 表 + 30 秒上手 + ⌘K + 5 架构原则 + 目录树 + provider 表
+- ✅ **`/api/keys`**：dev-only 诊断端点，返回 6 provider 配置状态（不返回 key 本身）
+- ✅ **`.env.example`**：6 provider + get key 链接
+
+**P2 · 协议层 + 真功能**
+- ✅ **`/api/ag-ui` / `/api/a2ui`** 接收 `?prompt=xxx` 关键词触发不同事件流（search / write / json / table / chart / form）
+- ✅ **JSON-UI 表达式求值**：`{user.name}` / `{a.b.c}` / `{a[0].b}` 自动替换 state 值（缺值保留原样）+ toggle Alice ↔ Carol
+- ✅ **JSON-UI dataModelUpdate 模拟**：useReducer 维护 bindingState，按 path dispatch + rerender
+- ✅ **8 个新子页骨架**（3.1.1-3.1.4 + 4.1.1-4.1.4）：用 `PlannedSubPage` 共享组件，W9-W12 真做
+- ✅ **`/api/health`** + **`/api/models`**：站点状态 + 模型注册表
+
+**P2 · 体验升级**
+- ✅ **JSON-UI 真 bar/line chart 渲染器**（不再 `📊 placeholder`）
+- ✅ **2.1.3 mixed 真量化评估**：4 指标条（nodes / bytes / expr / safety）+ 8 点 pros/cons
+- ✅ **LabSidebar active 子页 + 折叠/展开动效**：URL 自动展开当前 lab，planned 子页 disabled
+- ✅ **首页最近会话改真数据**：localStorage 持久化 + 跨页 `sessionsLog:updated` 事件联动
+- ✅ **5 个 lab 页 + `useLogSession` hook**：完成后写 sessionsLog（首页实时更新）
+- ✅ **`useLabActions` hook**：⌘K 的 run / stop / reset 真正派发到当前 lab
+
+### 当前真功能（已 verify）
+
+| Lab | 子页 | 真功能 | 数据源 |
+|---|---|---|---|
+| 1.1.1 Markdown | mock / api 双 source + 4 preset + 自定义 prompt + 停止/清空 + meta 解析 | DeepSeek 真 SSE（899ms first token，26 chunks） | `/api/chat` |
+| 1.1.2 AG-UI | typed event 流分类 + 时间轴 + 渲染管道（TextChunk / ToolCall） | 关键词触发不同 tool call | `/api/ag-ui` |
+| 1.1.3 A2UI | surface inspector（raw / tree / RenderableEvent） | 关键词触发不同 surface | `/api/a2ui` |
+| 1.1.4 Compare | 协议对照（事件粒度 / 工具调用 / 状态 / 渲染） | 3 协议选 chip 切换 | 内联 mock |
+| 2.1.1 TSX | iframe sandbox 隔离运行 + 编辑器 | 新 Function eval（评估后切 @babel/standalone） | 内联 mock |
+| 2.1.2 JSON-UI DSL | useReducer binding + `{}` 表达式求值 + dataModelUpdate 模拟 + 真 bar/line chart | SSE patch 流 + 本地 binding 切换 | `/api/json-ui` |
+| 2.1.3 Mixed | 双栏 side-by-side + 量化 trade-offs | 双管道并行 | 双 mock |
+
+### 验证
+
+```
+npm run verify
+  ✓ biome check .         (113 files, no fixes)
+  ✓ tsc --noEmit          (0 errors)
+  ✓ vitest run            (10 files / 68 tests)
+  ✓ next build            (25 routes: 17 static + 8 dynamic)
+```
+
+- 8 个新子页（3.1.x + 4.1.x）全部 `○ Static`
+- 8 个 API 端点全部 live（`/api/{chat,ag-ui,a2ui,json-ui,eval,replay,keys,health,models}`）
+
+### 已知尾巴（不在 P0/P1/P2，留给 W5+）
+
+1. `@babel/standalone` 真编译 TSX（要装 ~3MB 依赖）
+2. Lab 3 / Lab 4 的 8 个子页**真功能**（现在是骨架 + 真实数据预览）
+3. 主题切换 persistence 用 `useUiStore` 已经做，但 hot reload 时偶发 flicker（CSS 变量在 SSR 不一致）
+4. W4-7：lab-topbar.tsx 已删除并入 SiteHeader，但 `views/sync-search-params.tsx` 仍是单文件未拆
+5. ⌘K 的 actions 派发 `CustomEvent`，但**当前 lab 没注册 action 时是无操作**（不是 bug，但是 UI 上没提示）
+6. sessionsLog 是 localStorage，**W9 升级到 IndexedDB**（PROPOSAL §10 原始计划）
+
+---
+
 
 ## 7. 你可以选的下一步
 

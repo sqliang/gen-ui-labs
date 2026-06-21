@@ -6,15 +6,9 @@ import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 
 import { Badge } from "@/components/ui/badge";
+import { LABS } from "@/core/labs";
 import { useSessionStore } from "@/core/state/session-store";
 import { cn } from "@/lib/utils";
-
-const LAB_NAV = [
-  { id: "streaming", label: "Streaming", icon: Radio },
-  { id: "codegen", label: "Codegen", icon: Code2 },
-  { id: "workbench", label: "Workbench", icon: Eye },
-  { id: "observability", label: "Observability", icon: Bot },
-] as const;
 
 /**
  * 把 URL ?model=xxx / ?session=xxx / ?lab=xxx 同步进 session-store。
@@ -41,10 +35,26 @@ export function LabSidebar() {
   const pathname = usePathname();
   const currentSessionId = useSessionStore((s) => s.currentSessionId);
   const [mounted, setMounted] = useState(false);
+  // 默认展开当前 lab
+  const initialLabId = (() => {
+    if (typeof pathname === "string") {
+      const match = pathname.match(/^\/labs\/([^/]+)/);
+      if (match) return match[1];
+    }
+    return null;
+  })();
+  const [expandedLabId, setExpandedLabId] = useState<string | null>(initialLabId ?? null);
 
   useEffect(() => {
     setMounted(true);
   }, []);
+
+  // URL 切换时自动展开对应 lab
+  useEffect(() => {
+    if (typeof pathname !== "string") return;
+    const match = pathname.match(/^\/labs\/([^/]+)/);
+    if (match?.[1]) setExpandedLabId(match[1]);
+  }, [pathname]);
 
   // URL → session-store 单向同步（只在 mount 后）
   useUrlToStore();
@@ -61,25 +71,100 @@ export function LabSidebar() {
       </div>
 
       <nav className="flex-1 overflow-y-auto p-2 scrollbar-thin">
-        <ul className="space-y-1">
-          {LAB_NAV.map((item) => {
-            const Icon = item.icon;
-            const href = `/labs/${item.id}`;
-            const active = pathname.startsWith(href);
+        <ul className="space-y-0.5">
+          {LABS.map((lab) => {
+            const Icon =
+              lab.id === "streaming"
+                ? Radio
+                : lab.id === "codegen"
+                  ? Code2
+                  : lab.id === "workbench"
+                    ? Eye
+                    : Bot;
+            const href = `/labs/${lab.id}`;
+            const isLabActive = pathname.startsWith(href);
+            const isExpanded = expandedLabId === lab.id;
+            const subPages = lab.subPages;
             return (
-              <li key={item.id}>
-                <Link
-                  href={href}
+              <li key={lab.id}>
+                <button
+                  type="button"
+                  onClick={() => setExpandedLabId((cur) => (cur === lab.id ? null : lab.id))}
                   className={cn(
-                    "flex items-center gap-2.5 rounded-md px-3 py-2 text-sm transition-colors",
-                    active
+                    "group flex w-full items-center gap-2.5 rounded-md px-3 py-2 text-sm transition-colors",
+                    isLabActive
                       ? "bg-accent text-accent-foreground font-medium"
                       : "text-muted-foreground hover:text-foreground hover:bg-muted",
                   )}
                 >
-                  <Icon className="size-4" />
-                  <span>Lab · {item.label}</span>
-                </Link>
+                  <Icon className="size-4 shrink-0" />
+                  <span className="flex-1 text-left">Lab · {lab.id}</span>
+                  <span
+                    aria-hidden
+                    className={cn(
+                      "text-muted-foreground/60 transition-transform",
+                      isExpanded && "rotate-90",
+                    )}
+                  >
+                    ▸
+                  </span>
+                </button>
+                {/* 子页列表（折叠/展开） */}
+                {isExpanded && subPages.length > 0 ? (
+                  <ul
+                    className={cn(
+                      "mt-0.5 ml-4 space-y-0.5 border-l border-foreground/10 pl-2",
+                      "animate-in slide-in-from-top-1 fade-in-0 duration-200",
+                    )}
+                  >
+                    {subPages.map((sp) => {
+                      const isActive = pathname === sp.href;
+                      const isPlanned = sp.status === "planned";
+                      return (
+                        <li key={sp.href}>
+                          {isPlanned ? (
+                            <span
+                              className="text-muted-foreground/45 flex items-center gap-2 rounded-md px-2.5 py-1 font-mono text-[11px] cursor-not-allowed"
+                              title="WIP · roadmap"
+                            >
+                              <span className="text-muted-foreground/50">○</span>
+                              <span className="truncate">
+                                {sp.number} · {sp.title}
+                              </span>
+                            </span>
+                          ) : (
+                            <Link
+                              href={sp.href}
+                              className={cn(
+                                "flex items-center gap-2 rounded-md px-2.5 py-1 font-mono text-[11px] transition-colors",
+                                isActive
+                                  ? "bg-foreground/[0.08] text-foreground font-medium"
+                                  : "text-muted-foreground/85 hover:text-foreground hover:bg-foreground/[0.04]",
+                              )}
+                              title={sp.description}
+                            >
+                              <span
+                                className={cn(
+                                  "shrink-0",
+                                  sp.status === "done"
+                                    ? "text-emerald-400/80"
+                                    : sp.status === "wip"
+                                      ? "text-amber-400/80"
+                                      : "text-muted-foreground/50",
+                                )}
+                              >
+                                {sp.status === "done" ? "✓" : sp.status === "wip" ? "◐" : "○"}
+                              </span>
+                              <span className="truncate">
+                                {sp.number} · {sp.title}
+                              </span>
+                            </Link>
+                          )}
+                        </li>
+                      );
+                    })}
+                  </ul>
+                ) : null}
               </li>
             );
           })}

@@ -6,6 +6,8 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { LabContentPage } from "@/components/lab-content-page";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { useLabActions } from "@/lib/use-lab-actions";
+import { useLogSession } from "@/lib/use-log-session";
 
 const DEMO_CODE = `// LLM 生成的 JS 代码（在 sandbox iframe 执行）
 // 直接操作 DOM 创建 UI 元素
@@ -83,12 +85,21 @@ export default function TsxPage() {
   const [result, setResult] = useState<string | null>(null);
   const [errMsg, setErrMsg] = useState<string | null>(null);
 
+  // session 完成后写入 sessionsLog（必须在 handleRun 之前）
+  const { markStart, logSession } = useLogSession({
+    lab: "codegen",
+    protocol: "TSX",
+    getTitle: () => `TSX sandbox · ${result ? "✓ ok" : "…"}`,
+    getTokens: () => Math.ceil(DEMO_CODE.length / 4),
+  });
+
   const handleRun = useCallback(() => {
     setResult(null);
     setErrMsg(null);
+    markStart();
     if (!iframeRef.current?.contentWindow) return;
     iframeRef.current.contentWindow.postMessage({ id: Date.now(), code }, window.location.origin);
-  }, [code]);
+  }, [code, markStart]);
 
   const handleReset = useCallback(() => {
     setCode(DEMO_CODE);
@@ -96,19 +107,26 @@ export default function TsxPage() {
     setErrMsg(null);
   }, []);
 
-  const handleMessage = useCallback((event: MessageEvent) => {
-    if (event.data?.type !== "sandbox-result") return;
-    if (event.data.ok) {
-      setResult(event.data.result ?? "(empty)");
-    } else {
-      setErrMsg(event.data.error ?? "Unknown error");
-    }
-  }, []);
+  const handleMessage = useCallback(
+    (event: MessageEvent) => {
+      if (event.data?.type !== "sandbox-result") return;
+      if (event.data.ok) {
+        setResult(event.data.result ?? "(empty)");
+      } else {
+        setErrMsg(event.data.error ?? "Unknown error");
+      }
+      logSession();
+    },
+    [logSession],
+  );
 
   useEffect(() => {
     window.addEventListener("message", handleMessage);
     return () => window.removeEventListener("message", handleMessage);
   }, [handleMessage]);
+
+  // ⌘K action 监听：run / reset
+  useLabActions({ onStart: handleRun, onReset: handleReset });
 
   const errorMsg = errMsg;
 

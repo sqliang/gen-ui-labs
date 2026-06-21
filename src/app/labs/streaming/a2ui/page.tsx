@@ -7,6 +7,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { type A2uiComponentNode, type A2uiEvent, a2uiAdapter } from "@/core/protocols/a2ui/mapper";
 import { useStreamingStore } from "@/core/state/streaming-store";
 import { fetchSse } from "@/infra/http/sse-client";
+import { useLabActions } from "@/lib/use-lab-actions";
+import { useLogSession } from "@/lib/use-log-session";
 
 function eventKey(e: A2uiEvent, fallback: string): string {
   if (e.type === "dataModelUpdate") {
@@ -31,6 +33,7 @@ export default function A2uiPage() {
 
   const handleStart = async () => {
     start("a2ui");
+    markStart();
     setErrorMsg(null);
     setRawEvents([]);
     setComponentTree([]);
@@ -66,8 +69,24 @@ export default function A2uiPage() {
       setErrorMsg(msg);
     } finally {
       finish();
+      logSession();
     }
   };
+
+  // ⌘K action 监听：run / stop / reset
+  useLabActions({
+    onStart: handleStart,
+    onStop: () => finish(),
+    onReset: reset,
+  });
+
+  // session 完成后写入 sessionsLog
+  const { markStart, logSession } = useLogSession({
+    lab: "streaming",
+    protocol: "A2UI",
+    getTitle: () => `A2UI surface · ${componentTree.length} components`,
+    getTokens: () => rawEvents.length * 12,
+  });
 
   return (
     <LabContentPage

@@ -1,55 +1,11 @@
 import { ArrowDown, Code2, Terminal } from "lucide-react";
 import Link from "next/link";
-
 import { LabCard } from "@/components/home/lab-card";
 import { LiveTokenStream } from "@/components/home/live-token-stream";
+import { RecentSessionsSection } from "@/components/home/recent-sessions";
 import { Button } from "@/components/ui/button";
 import { LABS } from "@/core/labs";
 import { BUILTIN_MODELS } from "@/core/models/registry";
-
-// 最近会话 —— W9 接入 IndexedDB。这里写成"看起来像真的"的 mock
-const RECENT_SESSIONS = [
-  {
-    id: "ses_a8f3",
-    title: "Streaming Markdown demo",
-    lab: "streaming",
-    protocol: "MD",
-    tokens: 842,
-    duration: "1.7s",
-    updatedAt: "今天 21:24",
-    accent: LABS[0]?.accent.solid ?? "oklch(0.78 0.16 230)",
-  },
-  {
-    id: "ses_c2d1",
-    title: "AG-UI v0.2 protocol probe",
-    lab: "streaming",
-    protocol: "AG-UI",
-    tokens: 1620,
-    duration: "3.2s",
-    updatedAt: "今天 20:11",
-    accent: LABS[0]?.accent.solid ?? "oklch(0.78 0.16 230)",
-  },
-  {
-    id: "ses_91b7",
-    title: "JSON-UI DSL · dashboard",
-    lab: "codegen",
-    protocol: "DSL",
-    tokens: 2340,
-    duration: "4.5s",
-    updatedAt: "昨天 18:42",
-    accent: LABS[1]?.accent.solid ?? "oklch(0.74 0.18 290)",
-  },
-  {
-    id: "ses_4e8a",
-    title: "Workbench · 3-pane layout",
-    lab: "workbench",
-    protocol: "Inspector",
-    tokens: 0,
-    duration: "—",
-    updatedAt: "昨天 16:05",
-    accent: LABS[2]?.accent.solid ?? "oklch(0.82 0.16 75)",
-  },
-];
 
 // 站点级数据 —— 自动从 registry 派生，避免和 core 数据双写
 const PROVIDER_COUNT = new Set(BUILTIN_MODELS.map((m) => m.provider)).size;
@@ -239,81 +195,7 @@ export default function HomePage() {
       </section>
 
       {/* === 最近会话 === */}
-      <section className="mx-auto max-w-[1280px] px-6 pb-24">
-        <div className="mb-5 flex items-end justify-between gap-4">
-          <div>
-            <div className="text-muted-foreground/60 font-mono text-[11px] tracking-widest uppercase">
-              recent sessions
-            </div>
-            <h2 className="text-foreground/95 mt-1 text-2xl font-semibold tracking-tight">
-              最近会话
-            </h2>
-          </div>
-          <Button
-            asChild
-            variant="ghost"
-            size="sm"
-            className="text-muted-foreground/80 hover:text-foreground font-mono text-[11px]"
-          >
-            <Link href="/labs/streaming">view all →</Link>
-          </Button>
-        </div>
-
-        <div className="border-border/30 bg-card/30 overflow-hidden rounded-xl border backdrop-blur-sm">
-          <div className="border-border/20 text-muted-foreground/60 grid grid-cols-[1.5fr_0.6fr_0.5fr_0.5fr_auto] gap-4 border-b px-5 py-2.5 font-mono text-[10px] tracking-widest uppercase">
-            <span>session</span>
-            <span>protocol</span>
-            <span className="text-right">tokens</span>
-            <span className="text-right">duration</span>
-            <span>when</span>
-          </div>
-          <ul className="divide-border/20 divide-y">
-            {RECENT_SESSIONS.map((s) => (
-              <li
-                key={s.id}
-                className="hover:bg-foreground/[0.03] grid grid-cols-[1.5fr_0.6fr_0.5fr_0.5fr_auto] items-center gap-4 px-5 py-3.5 transition-colors"
-              >
-                <div className="flex min-w-0 items-center gap-3">
-                  <span
-                    className="size-2 shrink-0 rounded-full"
-                    style={{ backgroundColor: s.accent }}
-                  />
-                  <div className="min-w-0">
-                    <div className="text-foreground/95 truncate text-[13px] font-medium">
-                      {s.title}
-                    </div>
-                    <div className="text-muted-foreground/60 mt-0.5 font-mono text-[10px]">
-                      {s.id} · ~/{s.lab}
-                    </div>
-                  </div>
-                </div>
-                <span
-                  className="rounded px-1.5 py-0.5 font-mono text-[10px] w-fit"
-                  style={{
-                    backgroundColor: `${s.accent}1a`,
-                    color: s.accent,
-                  }}
-                >
-                  {s.protocol}
-                </span>
-                <span className="text-muted-foreground/85 text-right font-mono text-[12px] tabular-nums">
-                  {s.tokens > 0 ? s.tokens.toLocaleString() : "—"}
-                </span>
-                <span className="text-muted-foreground/70 text-right font-mono text-[12px] tabular-nums">
-                  {s.duration}
-                </span>
-                <span className="text-muted-foreground/65 font-mono text-[11px]">
-                  {s.updatedAt}
-                </span>
-              </li>
-            ))}
-          </ul>
-        </div>
-
-        <div className="text-muted-foreground/55 mt-3 font-mono text-[10px]">
-          {"// 这些是 mock 数据，w9 会接入 IndexedDB 存真实会话"}
-        </div>
-      </section>
+      <RecentSessionsSection />
 
       {/* === 底部脚注 === */}
       <footer className="border-border/30 mx-auto max-w-[1280px] border-t px-6 py-8">

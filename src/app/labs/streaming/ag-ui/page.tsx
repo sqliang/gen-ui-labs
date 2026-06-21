@@ -30,6 +30,8 @@ import {
 } from "@/core/protocols/ag-ui/mapper";
 import { useStreamingStore } from "@/core/state/streaming-store";
 import { fetchSse } from "@/infra/http/sse-client";
+import { useLabActions } from "@/lib/use-lab-actions";
+import { useLogSession } from "@/lib/use-log-session";
 import { cn } from "@/lib/utils";
 
 // ============================================================
@@ -610,6 +612,7 @@ export default function AguiPage() {
 
   const handleStart = async () => {
     start("ag-ui");
+    markStart();
     setErrorMsg(null);
     setRawEvents([]);
     setToolCalls({});
@@ -638,6 +641,7 @@ export default function AguiPage() {
       setErrorMsg(msg);
     } finally {
       finish();
+      logSession();
     }
   };
 
@@ -654,6 +658,18 @@ export default function AguiPage() {
     setNow(0);
   };
 
+  // ⌘K action 监听：run / stop / reset
+  useLabActions({ onStart: handleStart, onStop: handleStop, onReset: handleReset });
+
+  // session 完成后写入 sessionsLog
+  const { markStart, logSession } = useLogSession({
+    lab: "streaming",
+    protocol: "AG-UI",
+    getTitle: () => `AG-UI probe · ${rawEvents.length} events`,
+    getTokens: () => chunks.filter((c) => c.kind === "text").length * 8,
+  });
+
+  // 协议事件分类统计
   // 当前锚定事件的可读描述
   const anchoredEvent = anchoredEventIndex !== null ? rawEvents[anchoredEventIndex] : null;
   const anchoredSummary =
