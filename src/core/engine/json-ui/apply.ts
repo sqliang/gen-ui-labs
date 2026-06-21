@@ -49,8 +49,8 @@ function locate(doc: JsonUiDocument, segments: string[]): LocateResult | null {
     if (kind !== "children" || idxStr === undefined) return null;
     const idx = Number.parseInt(idxStr, 10);
     if (Number.isNaN(idx) || idx < 0) return null;
-    if (i === segments.length - 1) {
-      // 最后一段：cur 是 parent，idx 是 child index
+    // 终点：i + 2 === segments.length 表示下一段(idx)就是路径最后一段
+    if (i + 2 >= segments.length) {
       if (!cur.children) return null;
       if (idx >= cur.children.length) return null;
       return { parent: cur, idx, isRoot: false };
@@ -108,20 +108,21 @@ function mount(
     if (kind !== "children" || idxStr === undefined) return doc;
     const idx = Number.parseInt(idxStr, 10);
     if (Number.isNaN(idx) || idx < 0) return doc;
+    const isTerminal = i + 2 >= segments.length;
     if (!cur.children) cur.children = [];
-    // 补齐到 idx（中间创建 text 占位）
-    while (cur.children.length < idx) {
-      cur.children.push({ type: "text", props: { content: "" } });
-    }
-    if (i === segments.length - 1) {
-      // 终点：插入
-      cur.children[idx] = clone(value);
+    if (isTerminal) {
+      // 终点：splice 插入到 idx 位置（先 push 占位到 idx-1）
+      while (cur.children.length < idx) {
+        cur.children.push({ type: "text", props: { content: "" } });
+      }
+      cur.children.splice(idx, 0, clone(value));
       return { root };
     }
-    // 中间段：cur 走 idx
-    const next = cur.children[idx];
-    if (!next) return doc;
-    cur = next;
+    // 中间段：必须走到 idx 处 —— 补齐到 idx（含）保证 children[idx] 存在
+    while (cur.children.length <= idx) {
+      cur.children.push({ type: "text", props: { content: "" } });
+    }
+    cur = cur.children[idx] as JsonUiNode;
   }
   return doc;
 }
@@ -132,22 +133,40 @@ function patchNode(
   value: Partial<JsonUiNode> | undefined,
 ): JsonUiDocument {
   if (!value) return doc;
-  const loc = locate(doc, segments);
+  // 在 clone 上做：mutate 副本，保留原 doc 不可变
+  const root = clone(doc.root);
+  const loc = locate({ root }, segments);
   if (!loc) return doc;
   if (loc.isRoot) {
-    return { root: { ...doc.root, ...clone(value) } as JsonUiNode };
+    // root: value 是 Partial<JsonUiNode>，只覆盖指定字段（深 merge props）
+    return { root: mergeNodes(root, value) as JsonUiNode };
   }
   if (!loc.parent?.children) return doc;
   const target = loc.parent.children[loc.idx];
   if (!target) return doc;
-  loc.parent.children[loc.idx] = { ...target, ...clone(value) } as JsonUiNode;
-  return { root: clone(doc.root) };
+  loc.parent.children[loc.idx] = mergeNodes(target, value) as JsonUiNode;
+  return { root };
+}
+
+/** Partial 合并：partial.props 与 target.props 深 merge（partial 的键覆盖 target） */
+function mergeNodes(target: JsonUiNode, partial: Partial<JsonUiNode>): JsonUiNode {
+  const result: JsonUiNode = { ...target };
+  if (partial.type !== undefined) result.type = partial.type;
+  if (partial.id !== undefined) result.id = partial.id;
+  if (partial.props !== undefined) {
+    result.props = { ...(target.props ?? {}), ...partial.props };
+  }
+  if (partial.children !== undefined) {
+    result.children = partial.children.map((c) => clone(c));
+  }
+  return result;
 }
 
 function unmount(doc: JsonUiDocument, segments: string[]): JsonUiDocument {
-  const loc = locate(doc, segments);
+  const root = clone(doc.root);
+  const loc = locate({ root }, segments);
   if (!loc || loc.isRoot) return doc;
   if (!loc.parent?.children) return doc;
   loc.parent.children.splice(loc.idx, 1);
-  return { root: clone(doc.root) };
+  return { root };
 }
