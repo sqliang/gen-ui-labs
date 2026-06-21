@@ -1,7 +1,7 @@
 "use client";
 
 import { Crosshair, Layers, MousePointerClick } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { LabContentPage, StatusPill } from "@/components/lab-content-page";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -138,7 +138,7 @@ function listAllPaths(doc: JsonUiDocument): string[] {
 export default function WorkbenchInspectorPage() {
   const [tree, setTree] = useState<TreeKey>("streaming");
   const doc = TREES[tree].doc;
-  const [patches, setPatches] = useState<JsonUiPatch[]>([]);
+  const [_patches, setPatches] = useState<JsonUiPatch[]>([]);
   const [liveDoc, setLiveDoc] = useState<JsonUiDocument>(doc);
   const [isStreaming, setIsStreaming] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -156,9 +156,9 @@ export default function WorkbenchInspectorPage() {
   }, [tree]);
 
   // 首次 mount 时立即把 liveDoc 替换为新对象（避免与 doc reference 相等导致 outputEmpty 误判）
+  const initialTreeRef = useRef(tree);
   useEffect(() => {
-    setLiveDoc(TREES[tree].doc);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    setLiveDoc(TREES[initialTreeRef.current].doc);
   }, []);
 
   const allPaths = useMemo(() => listAllPaths(liveDoc), [liveDoc]);

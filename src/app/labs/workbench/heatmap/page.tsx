@@ -1,7 +1,7 @@
 "use client";
 
 import { Flame, Layers, Zap } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { LabContentPage, StatusPill } from "@/components/lab-content-page";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -220,9 +220,10 @@ export default function WorkbenchHeatmapPage() {
     setPinnedPath(null);
   }, [tree]);
 
+  // 首次 mount 时立即把 liveDoc 替换为新对象（避免与 doc reference 相等导致 outputEmpty 误判）
+  const initialTreeRef = useRef(tree);
   useEffect(() => {
-    setLiveDoc(TREES[tree].doc);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    setLiveDoc(TREES[initialTreeRef.current].doc);
   }, []);
 
   const allPaths = useMemo(() => listAllPaths(liveDoc), [liveDoc]);
