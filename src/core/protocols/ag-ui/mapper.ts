@@ -169,7 +169,16 @@ export interface StatefulProtocolAdapter<TExternalEvent = unknown> {
   reset(): void;
 }
 
-export function createAguiStatefulAdapter(): StatefulProtocolAdapter<AguiEvent> {
+/** 可选 sink：每次 adapt 完调用，让上游订阅"完整 tool chunk" / "state chunk" */
+export interface StatefulAdapterSink {
+  onTool?(tool: Extract<RenderableEvent, { kind: "tool" }>): void;
+  onState?(state: Extract<RenderableEvent, { kind: "state" }>): void;
+  onMeta?(meta: Extract<RenderableEvent, { kind: "control" }>): void;
+}
+
+export function createAguiStatefulAdapter(
+  sink?: StatefulAdapterSink,
+): StatefulProtocolAdapter<AguiEvent> {
   // toolCallId → { name, argsBuffer }
   const toolCalls = new Map<string, { name: string; argsBuffer: string }>();
   // 全局 state 累积
@@ -214,12 +223,14 @@ export function createAguiStatefulAdapter(): StatefulProtocolAdapter<AguiEvent> 
             // args 不完整时塞原始 buffer 让调用方处理
             parsedArgs = { _raw: tc.argsBuffer };
           }
-          out.push({
+          const toolEv: RenderableEvent = {
             kind: "tool",
             name: tc.name,
             args: parsedArgs,
             id: event.toolCallId,
-          });
+          };
+          out.push(toolEv);
+          sink?.onTool?.(toolEv as Extract<RenderableEvent, { kind: "tool" }>);
           toolCalls.delete(event.toolCallId);
           break;
         }
@@ -230,7 +241,11 @@ export function createAguiStatefulAdapter(): StatefulProtocolAdapter<AguiEvent> 
           for (const [path, value] of Object.entries(event.snapshot)) {
             stateBuffer.push({ op: "replace", path, value });
           }
-          out.push({ kind: "state", path: "/", value: event.snapshot });
+          {
+            const ev: RenderableEvent = { kind: "state", path: "/", value: event.snapshot };
+            out.push(ev);
+            sink?.onState?.(ev as Extract<RenderableEvent, { kind: "state" }>);
+          }
           break;
 
         case "STATE_DELTA":
@@ -238,11 +253,15 @@ export function createAguiStatefulAdapter(): StatefulProtocolAdapter<AguiEvent> 
           for (const patch of event.delta) {
             stateBuffer.push(patch);
           }
-          out.push({
-            kind: "state",
-            path: "/__delta__",
-            value: stateBuffer.slice(),
-          });
+          {
+            const ev: RenderableEvent = {
+              kind: "state",
+              path: "/__delta__",
+              value: stateBuffer.slice(),
+            };
+            out.push(ev);
+            sink?.onState?.(ev as Extract<RenderableEvent, { kind: "state" }>);
+          }
           break;
 
         case "RUN_STARTED":

@@ -21,12 +21,10 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import {
   type AguiEvent,
-  type AguiStateDelta,
-  type AguiStateSnapshot,
   type AguiToolCallArgs,
   type AguiToolCallEnd,
   type AguiToolCallStart,
-  aguiAdapter,
+  createAguiStatefulAdapter,
 } from "@/core/protocols/ag-ui/mapper";
 import { useStreamingStore } from "@/core/state/streaming-store";
 import { fetchSse } from "@/infra/http/sse-client";
@@ -568,47 +566,33 @@ export default function AguiPage() {
 
   const handleClearAnchor = () => setAnchoredEventIndex(null);
 
-  // 工具调用状态机 reducer
-  const updateToolCalls = (event: AguiEvent) => {
-    if (event.type === "TOOL_CALL_START") {
-      const e = event as AguiToolCallStart;
-      setToolCalls((prev) => ({
-        ...prev,
-        [e.toolCallId]: { id: e.toolCallId, name: e.toolCallName, args: {}, status: "calling" },
-      }));
-    } else if (event.type === "TOOL_CALL_ARGS") {
-      const e = event as AguiToolCallArgs;
-      setToolCalls((prev) => {
-        const existing = prev[e.toolCallId];
-        if (!existing) return prev;
-        // 增量 JSON：直接替换（mock 是完整 JSON；真实可能需要合并）
-        let parsed: unknown = {};
-        try {
-          parsed = JSON.parse(e.delta);
-        } catch {
-          parsed = existing.args;
-        }
-        return {
+  // 协议 stateful adapter（合并 tool call lifecycle + state 累积）
+  const adapterRef = useRef(
+    createAguiStatefulAdapter({
+      onTool: (tool) => {
+        setToolCalls((prev) => ({
           ...prev,
-          [e.toolCallId]: { ...existing, args: parsed, status: "args-done" },
-        };
-      });
-    } else if (event.type === "TOOL_CALL_END") {
-      const e = event as AguiToolCallEnd;
-      setToolCalls((prev) => {
-        const existing = prev[e.toolCallId];
-        if (!existing) return prev;
-        return { ...prev, [e.toolCallId]: { ...existing, status: "ended" } };
-      });
-    } else if (event.type === "STATE_SNAPSHOT") {
-      const e = event as AguiStateSnapshot;
-      setStateSnapshot(e.snapshot);
-    } else if (event.type === "STATE_DELTA") {
-      // 简化：把 delta 转成 JSON 显示（不真做 JSON-Patch）
-      const e = event as AguiStateDelta;
-      setStateSnapshot((prev) => ({ ...(prev ?? {}), _deltas: e.delta }));
-    }
-  };
+          [tool.id ?? ""]: {
+            id: tool.id ?? "",
+            name: tool.name,
+            args: tool.args,
+            status: "ended",
+          },
+        }));
+      },
+      onState: (state) => {
+        if (state.path === "/__delta__") {
+          // delta 累积：把 patch 列表存到 _deltas
+          setStateSnapshot((prev) => ({
+            ...(prev ?? {}),
+            _deltas: state.value,
+          }));
+        } else {
+          setStateSnapshot(state.value as Record<string, unknown>);
+        }
+      },
+    }),
+  );
 
   const handleStart = async () => {
     start("ag-ui");
@@ -618,6 +602,7 @@ export default function AguiPage() {
     setToolCalls({});
     setStateSnapshot(null);
     setAnchoredEventIndex(null);
+    adapterRef.current.reset();
     startTimeRef.current = performance.now();
     setNow(0);
 
@@ -630,11 +615,12 @@ export default function AguiPage() {
           continue;
         }
         setRawEvents((prev) => [...prev, agui]);
-        updateToolCalls(agui);
-
-        const re = aguiAdapter.adapt(agui);
-        append(re);
-        if (re.kind === "control" && re.type === "end") break;
+        const re = adapterRef.current.adapt(agui);
+        for (const e of re) {
+          append(e);
+          if (e.kind === "control" && e.type === "end") break;
+        }
+        if (re.some((e) => e.kind === "control" && e.type === "end")) break;
       }
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
@@ -688,18 +674,11 @@ export default function AguiPage() {
       isStreaming={isStreaming}
       errorMsg={errorMsg}
       onStart={handleStart}
-      onStop={handleStop}
       onReset={handleReset}
+      onStop={() => finish()}
       startLabel="开始 AG-UI 流式"
       outputTitle="ag-ui · stream inspector"
-      outputEmpty={rawEvents.length === 0}
-      outputEmptyHint={
-        <div className="text-muted-foreground/70 py-10 text-center font-mono text-[12px]">
-          点击「开始 AG-UI 流式」→
-          <br />
-          下方会出现协议流转图 + 三栏调试视图
-        </div>
-      }
+      outputEmpty={rawEvents.length === 0 && !isStreaming}
       outputExtra={
         <>
           <span className="text-muted-foreground/70 font-mono text-[10px] tabular-nums">
