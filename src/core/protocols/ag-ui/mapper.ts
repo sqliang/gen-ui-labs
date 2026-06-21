@@ -25,7 +25,10 @@ export interface AguiTextMessageContent {
 export interface AguiToolCallStart {
   type: "TOOL_CALL_START";
   toolCallId: string;
+  /** 工具名（spec 字段名） */
   toolCallName: string;
+  /** 兼容别名 */
+  name?: string;
   parentMessageId?: string;
 }
 
@@ -38,6 +41,8 @@ export interface AguiToolCallArgs {
 export interface AguiToolCallEnd {
   type: "TOOL_CALL_END";
   toolCallId: string;
+  /** 错误信息（如 tool call 失败） */
+  error?: string;
 }
 
 export interface AguiStateSnapshot {
@@ -47,7 +52,12 @@ export interface AguiStateSnapshot {
 
 export interface AguiStateDelta {
   type: "STATE_DELTA";
+  /** JSON Patch 风格 op 数组 */
   delta: Array<{ op: string; path: string; value?: unknown }>;
+  /** 简易单 op 形式（部分 server 推这种） */
+  op?: string;
+  path?: string;
+  value?: unknown;
 }
 
 export interface AguiRunStarted {
@@ -223,10 +233,16 @@ export function createAguiStatefulAdapter(
             // args 不完整时塞原始 buffer 让调用方处理
             parsedArgs = { _raw: tc.argsBuffer };
           }
+          // event.result 存在（成功）或 event.error 存在（失败）——
+          // 由于当前 spec 没明文 result 字段，先按 AguiToolCallEnd.error 走
+          const result = (event as { result?: unknown }).result;
+          const error = event.error;
           const toolEv: RenderableEvent = {
             kind: "tool",
             name: tc.name,
             args: parsedArgs,
+            ...(result !== undefined ? { result } : {}),
+            ...(error !== undefined ? { error } : {}),
             id: event.toolCallId,
           };
           out.push(toolEv);

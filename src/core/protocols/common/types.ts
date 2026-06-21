@@ -55,7 +55,9 @@ export interface ToolChunk {
   args: unknown;
   /** 工具结果（仅在 result 阶段出现） */
   result?: unknown;
-  /** 同一 toolCall 的关联 id（AG-UI 协议层面需要） */
+  /** 错误信息（仅在 error 阶段出现） */
+  error?: string;
+  /** 同一 toolCall 的关联 id（用于反查 lifecycle） */
   id?: string;
 }
 
