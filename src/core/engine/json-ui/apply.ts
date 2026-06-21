@@ -137,7 +137,7 @@ function patchNode(
   if (loc.isRoot) {
     return { root: { ...doc.root, ...clone(value) } as JsonUiNode };
   }
-  if (!loc.parent || !loc.parent.children) return doc;
+  if (!loc.parent?.children) return doc;
   const target = loc.parent.children[loc.idx];
   if (!target) return doc;
   loc.parent.children[loc.idx] = { ...target, ...clone(value) } as JsonUiNode;
@@ -147,7 +147,7 @@ function patchNode(
 function unmount(doc: JsonUiDocument, segments: string[]): JsonUiDocument {
   const loc = locate(doc, segments);
   if (!loc || loc.isRoot) return doc;
-  if (!loc.parent || !loc.parent.children) return doc;
+  if (!loc.parent?.children) return doc;
   loc.parent.children.splice(loc.idx, 1);
   return { root: clone(doc.root) };
 }

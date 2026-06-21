@@ -1,7 +1,9 @@
 "use client";
+
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Field, LabContentPage, PresetChips, StatusPill } from "@/components/lab-content-page";
 import { Button } from "@/components/ui/button";
+import { applyJsonUiPatch } from "@/core/engine/json-ui/apply";
 import { JsonUiRenderer } from "@/core/engine/json-ui/renderer";
 import type { JsonUiDocument, JsonUiNode, JsonUiPatch } from "@/core/engine/json-ui/types";
 import { fetchSse } from "@/infra/http/sse-client";
@@ -10,45 +12,27 @@ import { fetchSse } from "@/infra/http/sse-client";
  * Lab 3.1.1 — 三栏 Workbench（真功能）
  *
  * 设计：
- * - 左栏：DSL 源码 + "应用 patch" 按钮（用 fetchSse 跑 /api/json-ui 拿初始 doc + patches）
+ * - 左栏：DSL 源码（JSON.stringify 实时显示）
  * - 中栏：patch 流时间线（mount/patch/unmount 按类型 chip 化）
  * - 右栏：实时渲染（用 JsonUiRenderer）
  *
  * 不引新依赖（不装 monaco / react-resizable-panels）：
- * - 编辑器用 <textarea> + monospace 样式
- * - 3 栏用 CSS Grid + 拖拽 divider（pointer events 即可）
+ * - 3 栏用 CSS Grid 1fr 1fr 1fr
+ * - scenario chips 选 default / chart / form 触发不同 patch 序列
+ * - ⌘/Ctrl+Enter 快捷键
  *
  * 状态机：
  * - patches: 累积所有 patch
  * - doc: 累积的 JsonUiDocument
- * - selectedNodeId: 中栏 / 右栏 hover 同步
+ * - selectedNodeId: 中栏 hover 高亮
  */
-
-const STARTER_DSL = JSON.stringify(
-  {
-    type: "Card",
-    props: { title: "Metrics", accent: "oklch(0.78 0.16 230)" },
-    children: [
-      {
-        type: "Row",
-        children: [
-          { type: "KPI", props: { label: "Tokens", value: 1.2, unit: "k" } },
-          { type: "KPI", props: { label: "Latency", value: 899, unit: "ms" } },
-        ],
-      },
-      { type: "Text", props: { content: "JSON-UI workbench · 3-pane 实时调试" } },
-    ],
-  },
-  null,
-  2,
-);
 
 export default function WorkbenchThreePanePage() {
   const [doc, setDoc] = useState<JsonUiDocument>({
     root: { type: "text", props: { content: "等待…" } as never },
   });
   const [patches, setPatches] = useState<JsonUiPatch[]>([]);
-  const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
+  const [selectedNodePath, setSelectedNodePath] = useState<string | null>(null);
   const [isStreaming, setIsStreaming] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [scenario, setScenario] = useState<"default" | "chart" | "form">("default");
@@ -76,8 +60,6 @@ export default function WorkbenchThreePanePage() {
         } catch {
           continue;
         }
-        // 应用 patch
-        const { applyJsonUiPatch } = await import("@/core/engine/json-ui/apply");
         cur = applyJsonUiPatch(cur, patch);
         accumulated = [...accumulated, patch];
         setDoc(cur);
@@ -96,14 +78,14 @@ export default function WorkbenchThreePanePage() {
   // 节点统计
   const stats = useMemo(() => {
     let mounts = 0;
-    let patches_ = 0;
+    let patchesCount = 0;
     let unmounts = 0;
     for (const p of patches) {
       if (p.op === "mount") mounts++;
-      else if (p.op === "patch") patches_++;
+      else if (p.op === "patch") patchesCount++;
       else if (p.op === "unmount") unmounts++;
     }
-    return { mounts, patches: patches_, unmounts };
+    return { mounts, patches: patchesCount, unmounts };
   }, [patches]);
 
   // 键盘快捷键：Cmd/Ctrl+Enter 触发 start
@@ -135,7 +117,7 @@ export default function WorkbenchThreePanePage() {
       onReset={() => {
         setDoc({ root: { type: "text", props: { content: "已重置" } as never } });
         setPatches([]);
-        setSelectedNodeId(null);
+        setSelectedNodePath(null);
       }}
       startLabel="开始 patch 流"
       outputEmpty={patches.length === 0 && !isStreaming}
@@ -203,9 +185,9 @@ export default function WorkbenchThreePanePage() {
                       <li
                         key={`${p.op}-${p.path}-${i}`}
                         className={`hover:bg-foreground/[0.04] flex items-start gap-2 rounded px-2 py-1 ${
-                          selectedNodeId === p.path ? "bg-foreground/[0.06]" : ""
+                          selectedNodePath === p.path ? "bg-foreground/[0.06]" : ""
                         }`}
-                        onMouseEnter={() => setSelectedNodeId(p.path)}
+                        onMouseEnter={() => setSelectedNodePath(p.path)}
                       >
                         <span className="text-muted-foreground/50 tabular-nums">
                           {String(i + 1).padStart(3, "0")}

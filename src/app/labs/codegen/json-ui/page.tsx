@@ -4,8 +4,9 @@ import { useCallback, useReducer, useState } from "react";
 
 import { LabContentPage } from "@/components/lab-content-page";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { applyJsonUiPatch } from "@/core/engine/json-ui/apply";
 import { JsonUiRenderer } from "@/core/engine/json-ui/renderer";
-import type { JsonUiDocument, JsonUiNode, JsonUiPatch } from "@/core/engine/json-ui/types";
+import type { JsonUiDocument, JsonUiPatch } from "@/core/engine/json-ui/types";
 import { fetchSse } from "@/infra/http/sse-client";
 import { useLabActions } from "@/lib/use-lab-actions";
 import { useLogSession } from "@/lib/use-log-session";
@@ -50,28 +51,6 @@ const INITIAL_BINDING: Record<string, unknown> = {
   version: "0.1.0",
   lastUpdated: "2026-06-20",
 };
-
-function applyPatch(doc: JsonUiDocument, patch: JsonUiPatch): JsonUiDocument {
-  if (patch.op === "unmount") return doc;
-  const parts = patch.path.split("/").filter(Boolean);
-  if (parts[0] !== "root") return doc;
-  if (parts.length === 1) {
-    doc.root = patch.value as JsonUiNode;
-    return { ...doc };
-  }
-  let current: Record<string, unknown> = doc.root as unknown as Record<string, unknown>;
-  for (let i = 1; i < parts.length - 1; i++) {
-    const key = parts[i];
-    if (!key) break;
-    const next = current[key] as Record<string, unknown> | undefined;
-    if (!next) break;
-    current = next;
-  }
-  const lastKey = parts[parts.length - 1];
-  if (lastKey) current[lastKey] = patch.value;
-  return { ...doc, root: { ...doc.root } };
-}
-
 export default function JsonUiPage() {
   const [doc, setDoc] = useState<JsonUiDocument>({
     root: { type: "text", props: { content: "点击「开始」加载 JSON-UI" } },
@@ -106,7 +85,7 @@ export default function JsonUiPage() {
           continue;
         }
         setPatches((prev) => [...prev, patch]);
-        cur = applyPatch(cur, patch);
+        cur = applyJsonUiPatch(cur, patch);
         setDoc(cur);
         // 模拟 dataModelUpdate 改 binding state 的副作用
         if (patch.op === "patch" && patch.path.includes("/props/title")) {
