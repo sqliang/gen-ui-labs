@@ -21,6 +21,10 @@ export interface ModelInfo {
   label: string;
   /** context window（token 数） */
   contextWindow: number;
+  /** USD per 1M prompt tokens（input 成本） */
+  costPerMillionInput?: number;
+  /** USD per 1M completion tokens（output 成本） */
+  costPerMillionOutput?: number;
 }
 
 /** 聊天消息 */
