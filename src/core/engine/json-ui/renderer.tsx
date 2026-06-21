@@ -1,6 +1,6 @@
 "use client";
 
-import type { JSX } from "react";
+import { createContext, type JSX, useContext } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -8,36 +8,133 @@ import { evaluateJsonUiNode } from "./expr";
 import type { JsonUiNode } from "./types";
 
 /**
- * JSON-UI → React 递归渲染器。W6 范围：card / button / text / table / flex / grid / chart / input。
+ * JSON-UI → React 递归渲染器。
  *
- * `state` 是 JSON-UI 表达式求值的数据源（DSL 字符串里写 `{user.name}` → state.user.name）。
- * 没传 state 就当空对象，表达式保持原样。
+ * 特性：
+ * - 表达式求值：DSL 字符串里写 `{user.name}` → state.user.name
+ * - 节点路径注入：每个节点挂 `data-jsonui-path`（如 `/root/children/0`），供 Inspector 反向查找
+ * - 路径上下文通过 React Context 传递，避免每层手动算 path
+ *
+ * W6 范围：card / button / text / table / flex / grid / chart / input。
  */
-function renderChildren(children?: JsonUiNode[], state: unknown = {}): JSX.Element | null {
-  if (!children || children.length === 0) return null;
-  const evalChildren = children.map((c) => evaluateJsonUiNode(c, state));
+
+type PathContext = {
+  /** 当前节点的完整 path（从 root 算起） */
+  path: string;
+  /** 当节点被 hover 时回调（path） */
+  onHover?: (path: string) => void;
+  /** 当节点被点击时回调（path） */
+  onClick?: (path: string) => void;
+  /** 高亮目标 path（与当前节点 path 一致时加 ring） */
+  highlightPath?: string | null;
+};
+
+const PathCtx = createContext<PathContext | null>(null);
+
+function buildPath(parent: string, key: string | number): string {
+  if (typeof key === "number") return `${parent}/children/${key}`;
+  return `${parent}/${key}`;
+}
+
+function PathWrap({
+  path,
+  children,
+  className,
+  highlight,
+}: {
+  path: string;
+  children: React.ReactNode;
+  className?: string;
+  highlight?: boolean;
+}) {
+  const ctx = useContext(PathCtx);
+  return (
+    // biome-ignore lint/a11y/noStaticElementInteractions: DSL node click triggers Inspector select
+    // biome-ignore lint/a11y/useKeyWithClickEvents: hover-only intent; click optional via Inspector
+    <div
+      role={ctx?.onClick || ctx?.onHover ? "treeitem" : undefined}
+      tabIndex={ctx?.onClick ? 0 : undefined}
+      data-jsonui-path={path}
+      onMouseEnter={() => ctx?.onHover?.(path)}
+      onClick={(e) => {
+        if (e.defaultPrevented) return;
+        ctx?.onClick?.(path);
+      }}
+      className={className}
+      style={
+        highlight
+          ? {
+              outline: "1px solid var(--lab-accent, currentColor)",
+              outlineOffset: 2,
+              borderRadius: 4,
+            }
+          : undefined
+      }
+    >
+      {children}
+    </div>
+  );
+}
+
+function ChildrenRenderer({
+  nodes,
+  state,
+  parentPath,
+}: {
+  nodes: JsonUiNode[];
+  state: unknown;
+  parentPath: string;
+}): JSX.Element {
+  const ctx = useContext(PathCtx);
+  const evalChildren = nodes.map((c) => evaluateJsonUiNode(c, state));
   return (
     <>
-      {evalChildren.map((child, i) => (
-        <JsonUiRenderer key={child.id ?? `child-${i}`} node={child} state={state} />
-      ))}
+      {evalChildren.map((child, i) => {
+        const childPath = buildPath(parentPath, i);
+        return (
+          <PathCtx.Provider
+            key={child.id ?? `child-${i}`}
+            value={ctx ? { ...ctx } : { path: childPath }}
+          >
+            <JsonUiRendererCore node={child} state={state} path={childPath} />
+          </PathCtx.Provider>
+        );
+      })}
     </>
   );
 }
 
-export function JsonUiRenderer({
+function renderChildren(
+  children: JsonUiNode[] | undefined,
+  state: unknown,
+  parentPath: string,
+): JSX.Element | null {
+  if (!children || children.length === 0) return null;
+  return <ChildrenRenderer nodes={children} state={state} parentPath={parentPath} />;
+}
+
+function JsonUiRendererCore({
   node,
   state,
+  path,
 }: {
   node: JsonUiNode;
-  state?: unknown;
+  state: unknown;
+  path: string;
 }): JSX.Element {
+  const ctx = useContext(PathCtx);
   const evaluated = evaluateJsonUiNode(node, state);
   const p = evaluated.props ?? {};
+  const isHighlighted = ctx?.highlightPath === path;
+  const wrap = (children: React.ReactNode, key?: string) => (
+    <PathWrap key={key} path={path} className={undefined} highlight={isHighlighted}>
+      {children}
+    </PathWrap>
+  );
 
   switch (node.type) {
     case "card":
-      return (
+      return wrap(
         <Card className="mb-3">
           {p.title ? (
             <CardHeader className="p-3">
@@ -45,25 +142,25 @@ export function JsonUiRenderer({
             </CardHeader>
           ) : null}
           <CardContent className="p-3 pt-0">
-            {renderChildren(evaluated.children, state)}
+            {renderChildren(evaluated.children, state, path)}
           </CardContent>
-        </Card>
+        </Card>,
       );
 
     case "button":
-      return (
+      return wrap(
         <Button size="sm" variant={p.variant as "default" | "outline" | "ghost" | undefined}>
           {String(p.label ?? p.text ?? "Button")}
-        </Button>
+        </Button>,
       );
 
     case "text":
-      return <p className="text-muted-foreground text-sm">{String(p.content ?? "")}</p>;
+      return wrap(<p className="text-muted-foreground text-sm">{String(p.content ?? "")}</p>);
 
     case "table": {
       const columns = (p.columns as string[]) ?? [];
       const rows = (p.rows as unknown[][]) ?? [];
-      return (
+      return wrap(
         <div className="border-muted overflow-x-auto rounded-md border">
           <table className="w-full text-sm">
             <thead>
@@ -90,18 +187,22 @@ export function JsonUiRenderer({
               ))}
             </tbody>
           </table>
-        </div>
+        </div>,
       );
     }
 
     case "flex":
-      return (
-        <div className="flex flex-wrap gap-2">{renderChildren(evaluated.children, state)}</div>
+      return wrap(
+        <div className="flex flex-wrap gap-2">
+          {renderChildren(evaluated.children, state, path)}
+        </div>,
       );
 
     case "grid":
-      return (
-        <div className="grid grid-cols-2 gap-3">{renderChildren(evaluated.children, state)}</div>
+      return wrap(
+        <div className="grid grid-cols-2 gap-3">
+          {renderChildren(evaluated.children, state, path)}
+        </div>,
       );
 
     case "chart": {
@@ -111,7 +212,6 @@ export function JsonUiRenderer({
       const values = ((p.values as number[] | undefined) ?? []).map((v) =>
         Number.isFinite(v) ? Number(v) : 0,
       );
-      // p.data 是 alternate shape: { values: number[]; labels?: string[] }
       const dataValues =
         values.length > 0
           ? values
@@ -119,8 +219,7 @@ export function JsonUiRenderer({
               Number.isFinite(v) ? Number(v) : 0,
             );
       const max = dataValues.length > 0 ? Math.max(...dataValues, 1) : 1;
-
-      return (
+      return wrap(
         <Card className="border-foreground/10 bg-card/40">
           <CardHeader className="p-3">
             <CardTitle className="text-foreground/95 text-[12.5px] font-medium">
@@ -180,33 +279,79 @@ export function JsonUiRenderer({
                       key={i}
                       cx={i * 10 + 5}
                       cy={100 - (v / max) * 95}
-                      r="1.5"
-                      className="fill-foreground/80"
+                      r={1.8}
+                      className="text-foreground/80 fill-current"
                     />
                   ))}
                 </svg>
               </div>
             ) : (
-              <p className="text-muted-foreground/70 py-6 text-center font-mono text-[10.5px]">
-                {chartType} not supported yet
+              <p className="text-muted-foreground/70 py-4 text-center font-mono text-[10.5px]">
+                chart type "{chartType}" not supported
               </p>
             )}
           </CardContent>
-        </Card>
+        </Card>,
       );
     }
 
-    case "input":
-      return (
-        <input
-          type="text"
-          placeholder={String(p.placeholder ?? "")}
-          className="border-input bg-background w-full rounded-md border px-3 py-1.5 text-sm"
-          readOnly
-        />
+    case "input": {
+      const inputType = String(p.type ?? "text");
+      const inputId = `jsonui-input-${path.replace(/[^a-zA-Z0-9]/g, "-")}`;
+      return wrap(
+        <div className="mb-2">
+          {p.label ? (
+            <label htmlFor={inputId} className="text-muted-foreground mb-1 block text-xs">
+              {String(p.label)}
+            </label>
+          ) : null}
+          <input
+            id={inputId}
+            type={inputType}
+            defaultValue={String(p.value ?? "")}
+            placeholder={p.placeholder ? String(p.placeholder) : undefined}
+            className="border-input bg-background w-full rounded border px-2 py-1 text-sm"
+          />
+        </div>,
       );
+    }
 
     default:
-      return <div className="text-muted-foreground text-xs">Unknown: {node.type}</div>;
+      return wrap(
+        <div className="text-muted-foreground/70 text-xs">
+          [unknown node: {(node as { type: string }).type}]
+        </div>,
+      );
   }
+}
+
+export function JsonUiRenderer({
+  node,
+  state,
+  onHover,
+  onClick,
+  highlightPath,
+}: {
+  node: JsonUiNode;
+  state?: unknown;
+  /** 节点 hover 时回调（path） */
+  onHover?: (path: string) => void;
+  /** 节点 click 时回调（path） */
+  onClick?: (path: string) => void;
+  /** 高亮 path（与节点 path 一致时高亮） */
+  highlightPath?: string | null;
+}): JSX.Element {
+  const rootPath = "/root";
+  return (
+    <PathCtx.Provider
+      value={{
+        path: rootPath,
+        onHover,
+        onClick,
+        highlightPath: highlightPath ?? null,
+      }}
+    >
+      <JsonUiRendererCore node={node} state={state ?? {}} path={rootPath} />
+    </PathCtx.Provider>
+  );
 }
