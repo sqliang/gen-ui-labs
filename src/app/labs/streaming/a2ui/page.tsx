@@ -1,10 +1,14 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 
 import { LabContentPage } from "@/components/lab-content-page";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { type A2uiComponentNode, type A2uiEvent, a2uiAdapter } from "@/core/protocols/a2ui/mapper";
+import {
+  type A2uiComponentNode,
+  type A2uiEvent,
+  createA2uiStatefulAdapter,
+} from "@/core/protocols/a2ui/mapper";
 import { useStreamingStore } from "@/core/state/streaming-store";
 import { fetchSse } from "@/infra/http/sse-client";
 import { useLabActions } from "@/lib/use-lab-actions";
@@ -31,12 +35,16 @@ export default function A2uiPage() {
   const [componentTree, setComponentTree] = useState<A2uiComponentNode[]>([]);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
+  // 协议 stateful adapter（增量 mount/patch + 多 surface 维护）
+  const adapterRef = useRef(createA2uiStatefulAdapter());
+
   const handleStart = async () => {
     start("a2ui");
     markStart();
     setErrorMsg(null);
     setRawEvents([]);
     setComponentTree([]);
+    adapterRef.current.reset();
 
     try {
       for await (const evt of fetchSse("/api/a2ui", { body: {} })) {
@@ -48,20 +56,16 @@ export default function A2uiPage() {
         }
         setRawEvents((prev) => [...prev, a2ui]);
 
-        if (a2ui.type === "surfaceUpdate") {
-          setComponentTree(a2ui.contents);
-        } else if (a2ui.type === "dataModelUpdate") {
-          setComponentTree((prev) =>
-            prev.map((n) =>
-              n.props && a2ui.path.includes(n.id)
-                ? { ...n, props: { ...n.props, values: a2ui.value } }
-                : n,
-            ),
-          );
+        const re = adapterRef.current.adapt(a2ui);
+        // 用 snapshot 拿当前所有 surface → 同步到 componentTree
+        const snap = adapterRef.current.snapshot();
+        const firstSurface = snap.values().next().value;
+        if (firstSurface) {
+          setComponentTree(Array.from(firstSurface.components.values()));
         }
-
-        const re = a2uiAdapter.adapt(a2ui);
-        append(re);
+        for (const e of re) {
+          append(e);
+        }
         if (a2ui.type === "dismissSurface") break;
       }
     } catch (err) {
