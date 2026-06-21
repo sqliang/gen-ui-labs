@@ -448,9 +448,14 @@ export default function WorkbenchReplayPage() {
                     const i = patches.indexOf(p);
                     const applied = i < cursor;
                     const current = i === cursor - 1;
+                    // 同一个 (op, path) 可以重复出现，所以用 ordinal 区分
+                    // 第一次出现用 0，第二次用 1，依此类推（patches 顺序稳定）
+                    const ordinal =
+                      patches.slice(0, i + 1).filter((q) => q.op === p.op && q.path === p.path)
+                        .length - 1;
                     return (
                       <li
-                        key={`${p.op}-${p.path}-${patches.length}`}
+                        key={`${p.op}-${p.path}-${ordinal}`}
                         className={cn(
                           "flex items-center gap-1.5 rounded px-1.5 py-0.5 transition-colors",
                           current
