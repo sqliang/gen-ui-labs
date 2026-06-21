@@ -522,7 +522,7 @@ function DagSvg({
     >
       <title>Reasoning DAG</title>
       {/* edges */}
-      {edges.map((e, i) => {
+      {edges.map((e) => {
         const from = nodes.find((n) => n.id === e.from);
         const to = nodes.find((n) => n.id === e.to);
         if (!from || !to) return null;
