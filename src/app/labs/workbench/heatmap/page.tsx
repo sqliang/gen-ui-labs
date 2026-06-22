@@ -1,6 +1,6 @@
 "use client";
 
-import { Flame, Layers, Zap } from "lucide-react";
+import { Download, Flame, Layers, Zap } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { LabContentPage, StatusPill } from "@/components/lab-content-page";
 import { Button } from "@/components/ui/button";
@@ -321,6 +321,28 @@ export default function WorkbenchHeatmapPage() {
     setSimRunning(false);
   };
 
+  const handleExportMd = () => {
+    const lines: string[] = [];
+    lines.push("# Heatmap Report");
+    lines.push("");
+    lines.push(`Generated: ${new Date().toISOString()}`);
+    lines.push(`Tree: ${tree}`);
+    lines.push(`Total heat entries: ${heats.length}`);
+    lines.push("");
+    lines.push("| Node path | Kind | Severity | Message |");
+    lines.push("|---|---|---|---|");
+    for (const h of heats) {
+      lines.push(`| \`${h.path}\` | ${h.kind} | ${h.severity.toFixed(2)} | ${h.message} |`);
+    }
+    const blob = new Blob([`${lines.join("\n")}\n`], { type: "text/markdown" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `heatmap-${Date.now()}.md`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
   return (
     <LabContentPage
       labId="workbench"
@@ -344,6 +366,15 @@ export default function WorkbenchHeatmapPage() {
           <StatusPill label={`${totals.info} info`} tone={totals.info > 0 ? "accent" : "muted"} />
           <span className="text-muted-foreground/60">|</span>
           <span className="text-muted-foreground/70">{allPaths.length} nodes</span>
+          <button
+            type="button"
+            onClick={handleExportMd}
+            disabled={heats.length === 0}
+            className="text-muted-foreground/85 hover:text-foreground/95 ml-2 flex items-center gap-1.5 rounded border border-foreground/10 px-2 py-0.5 font-mono text-[10px] transition-colors disabled:opacity-40"
+          >
+            <Download className="size-3" />
+            export .md
+          </button>
         </div>
       }
       toolbar={
