@@ -1,0 +1,38 @@
+name: verify
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+# 一个 workflow 同时跑 lint + typecheck + test + build
+# 任何一步失败 → 整个 verify 红
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Verify (lint + typecheck + test + build)
+        run: npm run verify
+
+      - name: Upload build artifacts
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: next-build-${{ github.run_id }}
+          path: |
+            .next/
+            !.next/cache
+        retention-days: 3

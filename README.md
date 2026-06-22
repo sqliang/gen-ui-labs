@@ -2,8 +2,8 @@
 
 > **一个面向 GenUI 的实验性工作台**。4 个 Lab 并列：UI 协议流式、代码/DSL 生成、引擎调试、Agent 可观测。共享 1 个 Core、1 个 RenderableEvent 中间表示、1 个 streaming-store。
 
-![status](https://img.shields.io/badge/status-w4-blueviolet)
-![tests](https://img.shields.io/badge/tests-68%20passing-brightgreen)
+![status](https://img.shields.io/badge/status-w5-blueviolet)
+![tests](https://img.shields.io/badge/tests-120%20passing-brightgreen)
 ![stack](https://img.shields.io/badge/stack-Next.js%2016%20%C2%B7%20React%2019%20%C2%B7%20TS%205.9-blue)
 
 ## 🧪 4 Labs
