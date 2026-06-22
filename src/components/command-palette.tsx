@@ -155,6 +155,43 @@ export function CommandPalette() {
     it.push(action("reset-current", "重置当前 lab", "lab"));
     it.push(action("clear-current", "清空当前 lab 输出", "lab"));
 
+    // 全局 navigation —— 直接派发到路由
+    it.push({
+      id: "action-go-home",
+      label: "回到首页",
+      hint: "全局",
+      meta: "⚡ nav",
+      onSelect: () => router.push("/"),
+    });
+    it.push({
+      id: "action-go-about",
+      label: "打开 /about",
+      hint: "全局",
+      meta: "⚡ nav",
+      onSelect: () => router.push("/about"),
+    });
+    it.push({
+      id: "action-go-settings",
+      label: "打开 /settings/models",
+      hint: "全局",
+      meta: "⚡ nav",
+      onSelect: () => router.push("/settings/models"),
+    });
+    it.push({
+      id: "action-scroll-top",
+      label: "滚到页面顶部",
+      hint: "全局",
+      meta: "⚡ scroll",
+      onSelect: () => window.scrollTo({ top: 0, behavior: "smooth" }),
+    });
+    it.push({
+      id: "action-scroll-bottom",
+      label: "滚到页面底部",
+      hint: "全局",
+      meta: "⚡ scroll",
+      onSelect: () => window.scrollTo({ top: document.body.scrollHeight, behavior: "smooth" }),
+    });
+
     return it;
   }, [router]);
 
