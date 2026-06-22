@@ -48,10 +48,18 @@
 
 ### 已知问题
 
-- sessionsLog 仍是 localStorage（W9 升级 IndexedDB 跨设备同步）
-- heatmap overlay div visual outline 视觉看不到（PathWrap severity 注入颜色未完成）
-- 真 deepseek 端到端 e2e 还没自动化（当前是手动跑）
-- GitHub Actions CI 跑 `npm run verify`（仓库无 CI）
+（全部关闭 ✓ 详见 §10.7）
+
+- ~~sessionsLog IndexedDB 升级~~ → opt-in IDB module + localStorage fallback（`7a7c5f0`）
+- ~~heatmap overlay div visual outline~~ → PathWrap outlineForPath API（`1e5422a`）
+- ~~真 deepseek 端到端 e2e 自动化~~ → tests/manual/e2e-chat.ts（`2f5f80a`）
+- ~~GitHub Actions CI~~ → .github/workflows/verify.yml（`1896cf9`）
+
+W6+ 候选：
+- Lab 1 真 LLM 接入（除 markdown /api/chat 外）
+- Lab 2 加 agent 化（tool calling）
+- A2UI 多 surface 编排 UI（surface 切换已有）
+- 真 Playwright 浏览器 e2e（替代 manual curl）
 
 ## v0.1.0-w4 · 2026-06-20
 
