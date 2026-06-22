@@ -56,9 +56,9 @@
 - ~~GitHub Actions CI~~ → .github/workflows/verify.yml（`1896cf9`）
 
 W6+ 候选：
-- Lab 1 真 LLM 接入（除 markdown /api/chat 外）
+- Lab 1 真 LLM 接入（除 markdown /api/chat 外）→ **已实测 ✓** 真 deepseek 通过 /api/chat → markdown page → react-markdown 渲染
 - Lab 2 加 agent 化（tool calling）
-- A2UI 多 surface 编排 UI（surface 切换已有）
+- A2UI 多 surface 编排 UI（surface 切换 + 手动 add/delete/clear all 已加）
 - 真 Playwright 浏览器 e2e（替代 manual curl）
 
 ## v0.1.0-w4 · 2026-06-20

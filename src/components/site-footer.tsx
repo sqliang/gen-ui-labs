@@ -125,7 +125,7 @@ export function SiteFooter() {
         {/* bottom bar */}
         <div className="border-foreground/5 mt-10 flex flex-col items-start justify-between gap-3 border-t pt-6 sm:flex-row sm:items-center">
           <p className="text-muted-foreground/60 font-mono text-[10.5px]">
-            © 2026 sqliang · MIT license · v0.1.0-w4
+            © 2026 sqliang · MIT license · v0.1.0-w5 · 134 tests · seo + ci + indexeddb ready
           </p>
           <div className="flex items-center gap-3">
             <a
