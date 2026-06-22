@@ -48,10 +48,10 @@
 
 ### 已知问题
 
-- chart scenario 在 three-pane 还没实现（mock 数据未挂 chart 节点）
-- A2UI 多 surface 切换 UI 缺控件
-- 8 个子页导出功能只有 tokens / reasoning / score 做了
-- sessionsLog 仍是 localStorage（W9 升级 IndexedDB）
+- sessionsLog 仍是 localStorage（W9 升级 IndexedDB 跨设备同步）
+- heatmap overlay div visual outline 视觉看不到（PathWrap severity 注入颜色未完成）
+- 真 deepseek 端到端 e2e 还没自动化（当前是手动跑）
+- GitHub Actions CI 跑 `npm run verify`（仓库无 CI）
 
 ## v0.1.0-w4 · 2026-06-20
 
