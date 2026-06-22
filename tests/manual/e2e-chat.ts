@@ -94,17 +94,9 @@ async function main(): Promise<void> {
     messages: [{ role: "user", content: "你好" }],
   });
   assert("200 OK", status === 200, `status=${status}`);
-  assert(
-    "≥3 SSE events",
-    events.length >= 3,
-    `got ${events.length}`,
-  );
+  assert("≥3 SSE events", events.length >= 3, `got ${events.length}`);
   const first = events[0] as { type?: string } | undefined;
-  assert(
-    "first event has type",
-    typeof first?.type === "string",
-    `type=${first?.type}`,
-  );
+  assert("first event has type", typeof first?.type === "string", `type=${first?.type}`);
 
   // 2. Zod validation — missing model → 400
   console.log("\n[2] Zod validation: missing model");
@@ -115,11 +107,7 @@ async function main(): Promise<void> {
   });
   assert("400 Bad Request", res2.status === 400, `status=${res2.status}`);
   const body2 = await res2.text();
-  assert(
-    "error mentions model",
-    body2.includes("model"),
-    `body=${body2.slice(0, 80)}`,
-  );
+  assert("error mentions model", body2.includes("model"), `body=${body2.slice(0, 80)}`);
 
   // 3. Zod validation — empty messages → 400
   console.log("\n[3] Zod validation: empty messages");
