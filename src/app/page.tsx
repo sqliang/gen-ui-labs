@@ -16,8 +16,9 @@ const STATS = [
     value: String(BUILTIN_MODELS.length),
     hint: `${PROVIDER_COUNT} 个 provider`,
   },
-  { label: "tests", value: "120", hint: "vitest · green" },
-  { label: "scenarios", value: "5", hint: "long · tools · error · reconnect · default" },
+  { label: "tests", value: "134", hint: "vitest · green" },
+  { label: "scenarios", value: "3", hint: "chart · form · default" },
+  { label: "sub-pages", value: "17", hint: "13 真功能 + 4 wip" },
 ] as const;
 
 export default function HomePage() {
