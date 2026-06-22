@@ -1,13 +1,20 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 
 import { Button } from "@/components/ui/button";
+import { LABS } from "@/core/labs";
+
+export const metadata: Metadata = {
+  title: "404 · Page Not Found",
+  description: "这个路径没被任何 Lab 认领。可能它还在 roadmap 上，也可能打错了。",
+};
 
 /**
  * 全局 not-found 页 —— Next.js App Router 在任何路由 404 时渲染。
  *
  * 设计原则：
  * - 不要 Next.js 默认丑页
- * - 列出 4 个 Lab 入口帮助用户回到主线
+ * - 列出 4 个 Lab 入口帮助用户回到主线（用 core/labs.ts 数据源）
  * - 留 404 编号让"出错感"收敛到 1 个数字，不情绪化
  */
 export default function NotFound() {
@@ -52,30 +59,3 @@ export default function NotFound() {
     </div>
   );
 }
-
-const LABS = [
-  {
-    number: "01",
-    shortTitle: "streaming",
-    href: "/labs/streaming",
-    accent: { solid: "oklch(0.78 0.16 230)" },
-  },
-  {
-    number: "02",
-    shortTitle: "codegen",
-    href: "/labs/codegen",
-    accent: { solid: "oklch(0.74 0.18 290)" },
-  },
-  {
-    number: "03",
-    shortTitle: "workbench",
-    href: "/labs/workbench",
-    accent: { solid: "oklch(0.82 0.16 75)" },
-  },
-  {
-    number: "04",
-    shortTitle: "observability",
-    href: "/labs/observability",
-    accent: { solid: "oklch(0.78 0.15 150)" },
-  },
-];
