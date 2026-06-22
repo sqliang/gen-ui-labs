@@ -1,6 +1,6 @@
 "use client";
 
-import { AlertTriangle, Check, Clock, Wrench } from "lucide-react";
+import { AlertTriangle, Check, Clock, Download, Wrench } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import { LabContentPage, StatusPill } from "@/components/lab-content-page";
@@ -153,6 +153,22 @@ export default function ToolsPage() {
     adapterRef.current.reset();
   };
 
+  const handleExportJson = () => {
+    const trace = {
+      version: 1,
+      generatedAt: new Date().toISOString(),
+      toolCalls: Object.values(toolCalls).sort((a, b) => a.startTs - b.startTs),
+      rawEvents,
+    };
+    const blob = new Blob([JSON.stringify(trace, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `tool-trace-${Date.now()}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
   const rows = useMemo(
     () => Object.values(toolCalls).sort((a, b) => a.startTs - b.startTs),
     [toolCalls],
@@ -234,6 +250,15 @@ export default function ToolsPage() {
               ))}
             </div>
           </div>
+          <button
+            type="button"
+            onClick={handleExportJson}
+            disabled={rawEvents.length === 0}
+            className="text-muted-foreground/85 hover:text-foreground/95 ml-auto flex items-center gap-1.5 rounded border border-foreground/10 px-2 py-1 font-mono text-[10.5px] transition-colors disabled:opacity-40"
+          >
+            <Download className="size-3" />
+            export trace.json
+          </button>
         </div>
       }
       output={
