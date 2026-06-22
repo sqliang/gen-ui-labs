@@ -33,6 +33,8 @@ export default function A2uiPage() {
   const { chunks, isStreaming, start, append, finish, reset } = useStreamingStore();
   const [rawEvents, setRawEvents] = useState<A2uiEvent[]>([]);
   const [componentTree, setComponentTree] = useState<A2uiComponentNode[]>([]);
+  const [surfaces, setSurfaces] = useState<Map<string, A2uiComponentNode[]>>(new Map());
+  const [activeSurface, setActiveSurface] = useState<string | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   // 协议 stateful adapter（增量 mount/patch + 多 surface 维护）
@@ -44,6 +46,8 @@ export default function A2uiPage() {
     setErrorMsg(null);
     setRawEvents([]);
     setComponentTree([]);
+    setSurfaces(new Map());
+    setActiveSurface(null);
     adapterRef.current.reset();
 
     try {
@@ -57,16 +61,35 @@ export default function A2uiPage() {
         setRawEvents((prev) => [...prev, a2ui]);
 
         const re = adapterRef.current.adapt(a2ui);
-        // 用 snapshot 拿当前所有 surface → 同步到 componentTree
+        // 用 snapshot 拿当前所有 surface → 同步到 surfaces map
         const snap = adapterRef.current.snapshot();
-        const firstSurface = snap.values().next().value;
-        if (firstSurface) {
-          setComponentTree(Array.from(firstSurface.components.values()));
+        const nextSurfaces = new Map<string, A2uiComponentNode[]>();
+        for (const [id, surface] of snap) {
+          nextSurfaces.set(id, Array.from(surface.components.values()));
+        }
+        setSurfaces(nextSurfaces);
+        // 如果还没选 active，选第一个；已选则保留
+        setActiveSurface((prev) => {
+          if (prev && nextSurfaces.has(prev)) return prev;
+          return nextSurfaces.keys().next().value ?? null;
+        });
+        // 同步 componentTree 到当前 active
+        const surfaceId =
+          a2ui.type === "surfaceUpdate" || a2ui.type === "dataModelUpdate" ? a2ui.surfaceId : null;
+        if (surfaceId && nextSurfaces.has(surfaceId)) {
+          setComponentTree(nextSurfaces.get(surfaceId) ?? []);
+        } else {
+          // fallback: 第一个 surface
+          const first = nextSurfaces.values().next().value ?? [];
+          setComponentTree(first);
         }
         for (const e of re) {
           append(e);
         }
-        if (a2ui.type === "dismissSurface") break;
+        if (a2ui.type === "dismissSurface") {
+          // dismiss 后从 map 删（snapshot 已自动删），但要清空 active 如果是它
+          if (surfaceId === activeSurface) setActiveSurface(null);
+        }
       }
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
@@ -121,6 +144,10 @@ export default function A2uiPage() {
           </span>
           <span className="text-muted-foreground/40">·</span>
           <span className="text-muted-foreground/70 font-mono text-[10px] tabular-nums">
+            {surfaces.size} surfaces
+          </span>
+          <span className="text-muted-foreground/40">·</span>
+          <span className="text-muted-foreground/70 font-mono text-[10px] tabular-nums">
             {componentTree.length} nodes
           </span>
           <span className="text-muted-foreground/40">·</span>
@@ -128,6 +155,34 @@ export default function A2uiPage() {
             {chunks.length} chunks
           </span>
         </>
+      }
+      toolbar={
+        surfaces.size > 0 ? (
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-muted-foreground/80 font-mono text-[10px] tracking-wider uppercase">
+              surface
+            </span>
+            <div className="flex flex-wrap gap-1">
+              {Array.from(surfaces.keys()).map((id) => (
+                <button
+                  type="button"
+                  key={id}
+                  onClick={() => {
+                    setActiveSurface(id);
+                    setComponentTree(surfaces.get(id) ?? []);
+                  }}
+                  className={
+                    activeSurface === id
+                      ? "rounded border border-sky-500/30 bg-sky-500/10 px-2 py-0.5 font-mono text-[10px] text-sky-300"
+                      : "rounded border border-foreground/10 px-2 py-0.5 font-mono text-[10px] text-muted-foreground/85 hover:border-foreground/30"
+                  }
+                >
+                  {id}
+                </button>
+              ))}
+            </div>
+          </div>
+        ) : null
       }
       output={
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
