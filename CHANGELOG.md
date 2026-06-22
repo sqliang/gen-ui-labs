@@ -2,6 +2,57 @@
 
 > 周节奏（Friday ship）。每周末汇总：已交付 + 进行中 + 下周计划。
 
+## v0.1.0-w5 · 2026-06-21
+
+> 当前 active。W5 协议深化 + Lab 3/4 全部从骨架升级为真功能。
+
+### 已交付
+
+**协议层**
+
+- `core/protocols/common/lifecycle.ts` —— `EventMeta` + `createRunMeta` + `makeEnricher` + `enrichAll`（djb2 hash sessionId）
+- `core/protocols/ag-ui/mapper.ts` —— `createAguiStatefulAdapter(sink?)` 合并 TOOL_CALL_START/ARGS/END lifecycle + `StatefulAdapterSink` 接口
+- `core/protocols/a2ui/mapper.ts` —— `createA2uiStatefulAdapter()` 多 surface 树 + 增量 mount/patch + dataModel 浅 merge + `snapshot()`
+- `core/engine/json-ui/apply.ts` —— `applyJsonUiPatch(doc, patch)` 前后端共用，修 3 个真 bug（mount 单层 path 解析 / patchNode mutate 原 doc / 终点判定错）
+- `core/protocols/common/types.ts` —— `ToolChunk.error?` 字段
+
+**Lab 3 Workbench**（4/4 真功能）
+
+- 3.1.1 Three-pane：3 栏 CSS Grid + scenario chips + 模拟 SSE 流 + 实时 JsonUiRenderer
+- 3.1.2 Inspector：3 树切换 + onHover 节点高亮 DSL 源码 + 钉住 + 节点 props 详情
+- 3.1.3 Heatmap：3 kind（ERROR/WARN/INFO）+ severity 0-1 + 模拟事件流
+- 3.1.4 Replay：scrubber + 6 按钮 + 速度 0.5x-4x + 导出导入 JSON dump
+
+**Lab 4 Observability**（4/4 真功能）
+
+- 4.1.1 Tokens：4 KPI + 2 SVG 图表（TTFT sparkline / 累积成本 area）+ 模型成本表 + 6 颜色 provider 调色板
+- 4.1.2 Tools：3 栏（waterfall + raw events + inspector）+ createAguiStatefulAdapter 真接
+- 4.1.3 Reasoning：3 patterns（CoT / ReAct / Plan）+ SVG DAG 自动布局 + scrubber + 导出 .md
+- 4.1.4 Score：prompt select + 13 model 切换 + 4 维启发式评分 + SVG 雷达图 + 横向对比表
+
+**Model registry 升级**
+
+- `ModelInfo.costPerMillionInput` / `costPerMillionOutput` 字段
+- 13 BUILTIN_MODELS 加 2026 实际 USD 价格（gpt-4o-mini \$0.15/\$0.60, claude-sonnet-4-5 \$3/\$15 等）
+- Ollama 本地 = \$0
+
+**JsonUiRenderer 升级**
+
+- 注入 `data-jsonui-path` attribute on every node
+- `PathCtx` Context（onHover / onSelect / highlightPath）
+- a11y `role="treeitem"` for table / chart
+
+**测试**
+
+- **120 vitest tests**（68 → 120，+52：lifecycle 12 + ag-ui-stateful 10 + a2ui-stateful 13 + json-ui-apply 17）
+
+### 已知问题
+
+- chart scenario 在 three-pane 还没实现（mock 数据未挂 chart 节点）
+- A2UI 多 surface 切换 UI 缺控件
+- 8 个子页导出功能只有 tokens / reasoning / score 做了
+- sessionsLog 仍是 localStorage（W9 升级 IndexedDB）
+
 ## v0.1.0-w4 · 2026-06-20
 
 > 当前 active。站点感觉像真产品了：顶栏模型选择器 / 主题切换 / ⌘K 命令面板 / footer / 404 / about / settings。
