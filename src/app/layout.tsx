@@ -19,9 +19,41 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "GenUI Labs",
+  metadataBase: new URL("http://localhost:3000"),
+  title: {
+    default: "GenUI Labs · 协议驱动的生成式 UI 实验室",
+    template: "%s · GenUI Labs",
+  },
   description:
-    "实验性工作台：UI 协议流式渲染 · LLM 生成 UI 代码/DSL · 渲染引擎调试 · Agent 可观测性",
+    "实验性工作台：UI 协议流式渲染 · LLM 生成 UI 代码/DSL · 渲染引擎调试 · Agent 可观测性。4 个 Lab 并列，1 个共享内核。",
+  keywords: [
+    "GenUI",
+    "Generative UI",
+    "Streaming Protocol",
+    "AG-UI",
+    "A2UI",
+    "JSON-UI",
+    "LLM",
+    "Agent",
+    "Next.js 16",
+    "React 19",
+  ],
+  authors: [{ name: "sqliang" }],
+  openGraph: {
+    title: "GenUI Labs · 协议驱动的生成式 UI 实验室",
+    description: "把 LLM / Agent 的输出打开来看：流式协议、UI 代码生成、引擎调试、推理可观测。",
+    type: "website",
+    locale: "zh_CN",
+  },
+  twitter: {
+    card: "summary",
+    title: "GenUI Labs",
+    description: "协议驱动的生成式 UI 实验室",
+  },
+  robots: {
+    index: true,
+    follow: true,
+  },
 };
 
 export default function RootLayout({
