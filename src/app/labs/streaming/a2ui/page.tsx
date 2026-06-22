@@ -1,5 +1,6 @@
 "use client";
 
+import { Plus, Trash2 } from "lucide-react";
 import { useRef, useState } from "react";
 
 import { LabContentPage } from "@/components/lab-content-page";
@@ -107,6 +108,42 @@ export default function A2uiPage() {
     onReset: reset,
   });
 
+  // ===== Surface 编排（手动 add / delete / switch）=====
+  // provider 也可推 add/remove surface（流式自动）—— 这里 UI 让用户在 idle 时手动编排。
+  const handleAddSurface = () => {
+    let id = "";
+    for (let i = surfaces.size; i < 100; i++) {
+      const candidate = `surface_${i}`;
+      if (!surfaces.has(candidate)) {
+        id = candidate;
+        break;
+      }
+    }
+    if (!id) return;
+    const next = new Map(surfaces);
+    next.set(id, []);
+    setSurfaces(next);
+    setActiveSurface(id);
+    setComponentTree([]);
+  };
+
+  const handleDeleteSurface = (id: string) => {
+    if (!surfaces.has(id)) return;
+    const next = new Map(surfaces);
+    next.delete(id);
+    setSurfaces(next);
+    if (activeSurface === id) {
+      setActiveSurface(null);
+      setComponentTree([]);
+    }
+  };
+
+  const handleClearAllSurfaces = () => {
+    setSurfaces(new Map());
+    setActiveSurface(null);
+    setComponentTree([]);
+  };
+
   // session 完成后写入 sessionsLog
   const { markStart, logSession } = useLogSession({
     lab: "streaming",
@@ -164,22 +201,53 @@ export default function A2uiPage() {
             </span>
             <div className="flex flex-wrap gap-1">
               {Array.from(surfaces.keys()).map((id) => (
+                <div key={id} className="group flex items-center">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setActiveSurface(id);
+                      setComponentTree(surfaces.get(id) ?? []);
+                    }}
+                    className={
+                      activeSurface === id
+                        ? "rounded-l border border-r-0 border-sky-500/30 bg-sky-500/10 px-2 py-0.5 font-mono text-[10px] text-sky-300"
+                        : "rounded-l border border-r-0 border-foreground/10 px-2 py-0.5 font-mono text-[10px] text-muted-foreground/85 hover:border-foreground/30"
+                    }
+                  >
+                    {id}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleDeleteSurface(id)}
+                    aria-label={`Delete ${id}`}
+                    className={
+                      activeSurface === id
+                        ? "rounded-r border border-l-0 border-sky-500/30 bg-sky-500/10 px-1.5 py-0.5 text-sky-300/70 hover:bg-rose-500/15 hover:text-rose-300"
+                        : "rounded-r border border-l-0 border-foreground/10 px-1.5 py-0.5 text-muted-foreground/60 hover:bg-rose-500/15 hover:text-rose-300"
+                    }
+                  >
+                    <Trash2 className="size-2.5" />
+                  </button>
+                </div>
+              ))}
+              <button
+                type="button"
+                onClick={handleAddSurface}
+                aria-label="Add surface"
+                className="flex items-center gap-1 rounded border border-foreground/10 px-2 py-0.5 font-mono text-[10px] text-muted-foreground/85 hover:border-foreground/30 hover:text-foreground"
+              >
+                <Plus className="size-2.5" />
+                add
+              </button>
+              {surfaces.size > 1 && (
                 <button
                   type="button"
-                  key={id}
-                  onClick={() => {
-                    setActiveSurface(id);
-                    setComponentTree(surfaces.get(id) ?? []);
-                  }}
-                  className={
-                    activeSurface === id
-                      ? "rounded border border-sky-500/30 bg-sky-500/10 px-2 py-0.5 font-mono text-[10px] text-sky-300"
-                      : "rounded border border-foreground/10 px-2 py-0.5 font-mono text-[10px] text-muted-foreground/85 hover:border-foreground/30"
-                  }
+                  onClick={handleClearAllSurfaces}
+                  className="rounded border border-foreground/10 px-2 py-0.5 font-mono text-[10px] text-muted-foreground/70 hover:border-rose-500/40 hover:text-rose-300"
                 >
-                  {id}
+                  clear all
                 </button>
-              ))}
+              )}
             </div>
           </div>
         ) : null

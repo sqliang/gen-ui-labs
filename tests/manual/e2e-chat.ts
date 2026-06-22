@@ -140,13 +140,11 @@ async function main(): Promise<void> {
 
   // 6. /api/chat deepseek (real provider — skipped if no key)
   console.log("\n[6] /api/chat deepseek real (skipped if no key)");
-  const dsKey = (
-    keys.providers as Array<{ provider: string; configured: boolean }>
-  ).find((p) => p.provider === "deepseek")?.configured;
+  const dsKey = (keys.providers as Array<{ provider: string; configured: boolean }>).find(
+    (p) => p.provider === "deepseek",
+  )?.configured;
   if (!dsKey) {
-    console.log(
-      "  ⊘ skip — DEEPSEEK_API_KEY not configured in .env.local",
-    );
+    console.log("  ⊘ skip — DEEPSEEK_API_KEY not configured in .env.local");
   } else {
     const { status: dsStatus, events: dsEvents } = await fetchSse(
       {
@@ -160,11 +158,7 @@ async function main(): Promise<void> {
       .filter((e) => e.kind === "text")
       .map((e) => e.delta)
       .join("");
-    assert(
-      "got text delta",
-      text.length > 0,
-      `len=${text.length} sample="${text.slice(0, 40)}"`,
-    );
+    assert("got text delta", text.length > 0, `len=${text.length} sample="${text.slice(0, 40)}"`);
   }
 
   // summary
