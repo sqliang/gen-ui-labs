@@ -432,50 +432,25 @@ export default function WorkbenchHeatmapPage() {
                   onHover={setHoveredPath}
                   onClick={setPinnedPath}
                   highlightPath={activePath}
-                />
-                {/* 热力 outline overlay：纯 CSS + position absolute，每个 path 一个 marker */}
-                <div className="pointer-events-none absolute inset-3">
-                  {allPaths.map((p) => {
+                  outlineForPath={(p: string) => {
                     const h = heatByPath.get(p);
-                    if (!h) return null;
-                    const hasError = h.error > 0;
-                    const hasWarn = h.warn > 0;
-                    const hasInfo = h.info > 0;
-                    if (!hasError && !hasWarn && !hasInfo) return null;
-                    return (
-                      <span
-                        key={p}
-                        data-heat-path={p}
-                        data-error={hasError ? h.error : 0}
-                        data-warn={hasWarn ? h.warn : 0}
-                        data-info={hasInfo ? h.info : 0}
-                        className="absolute"
-                        style={{
-                          // outline 用 dual color：error + warn 叠加
-                          outline: hasError
-                            ? `2px solid ${KIND_COLOR.error}`
-                            : hasWarn
-                              ? `2px solid ${KIND_COLOR.warn}`
-                              : `1.5px solid ${KIND_COLOR.info}`,
-                          outlineOffset: 1,
-                          borderRadius: 4,
-                          // alpha 用 severity
-                          opacity: hasError
-                            ? h.error
-                            : hasWarn
-                              ? 0.4 + h.warn * 0.4
-                              : 0.3 + h.info * 0.3,
-                          // 占位
-                          top: 0,
-                          left: 0,
-                          width: 0,
-                          height: 0,
-                          display: "none", // 仅作为数据载体；实际 outline 由 PathWrap 通过 ctx 渲染
-                        }}
-                      />
-                    );
-                  })}
-                </div>
+                    if (!h) return undefined;
+                    const e = h.error;
+                    const w = h.warn;
+                    const i = h.info;
+                    const maxKind = Math.max(e, w, i);
+                    if (maxKind === 0) return undefined;
+                    const intensity = Math.min(1, 0.35 + maxKind * 0.25);
+                    const alpha = Math.round(intensity * 100);
+                    if (e > 0) {
+                      return `outline outline-2 outline-rose-500/${alpha}`;
+                    }
+                    if (w > 0) {
+                      return `outline outline-2 outline-amber-400/${alpha}`;
+                    }
+                    return `outline outline-2 outline-sky-400/${alpha}`;
+                  }}
+                />
               </div>
             </CardContent>
           </Card>

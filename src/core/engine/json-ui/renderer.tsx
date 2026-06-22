@@ -27,6 +27,8 @@ type PathContext = {
   onClick?: (path: string) => void;
   /** 高亮目标 path（与当前节点 path 一致时加 ring） */
   highlightPath?: string | null;
+  /** 按 path 查 outline 类名（用于 heatmap / inspector 高亮） */
+  outlineForPath?: (path: string) => string | undefined;
 };
 
 const PathCtx = createContext<PathContext | null>(null);
@@ -48,6 +50,7 @@ function PathWrap({
   highlight?: boolean;
 }) {
   const ctx = useContext(PathCtx);
+  const outlineClass = ctx?.outlineForPath?.(path);
   return (
     // biome-ignore lint/a11y/noStaticElementInteractions: DSL node click triggers Inspector select
     // biome-ignore lint/a11y/useKeyWithClickEvents: hover-only intent; click optional via Inspector
@@ -71,6 +74,13 @@ function PathWrap({
           : undefined
       }
     >
+      {outlineClass ? (
+        <span
+          aria-hidden
+          className={`pointer-events-none absolute inset-0 rounded ${outlineClass}`}
+          style={{ zIndex: 1 }}
+        />
+      ) : null}
       {children}
     </div>
   );
@@ -358,6 +368,7 @@ export function JsonUiRenderer({
   onHover,
   onClick,
   highlightPath,
+  outlineForPath,
 }: {
   node: JsonUiNode;
   state?: unknown;
@@ -367,6 +378,8 @@ export function JsonUiRenderer({
   onClick?: (path: string) => void;
   /** 高亮 path（与节点 path 一致时高亮） */
   highlightPath?: string | null;
+  /** 按 path 查 outline 类名（用于 heatmap / 错误高亮） */
+  outlineForPath?: (path: string) => string | undefined;
 }): JSX.Element {
   const rootPath = "/root";
   return (
@@ -376,6 +389,7 @@ export function JsonUiRenderer({
         onHover,
         onClick,
         highlightPath: highlightPath ?? null,
+        outlineForPath,
       }}
     >
       <JsonUiRendererCore node={node} state={state ?? {}} path={rootPath} />
