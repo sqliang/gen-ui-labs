@@ -9,6 +9,12 @@
  */
 
 const STORAGE_KEY = "gen-ui-labs.sessions-log";
+const EVENT_NAME = "sessionsLog:updated";
+
+function emit(): void {
+  if (typeof window === "undefined") return;
+  window.dispatchEvent(new Event(EVENT_NAME));
+}
 
 export interface SessionLogEntry {
   id: string;
@@ -39,6 +45,7 @@ export function writeSessionsLog(entries: SessionLogEntry[]): void {
   if (typeof window === "undefined") return;
   try {
     window.localStorage.setItem(STORAGE_KEY, JSON.stringify(entries));
+    emit();
   } catch {
     // ignore quota errors
   }
@@ -55,4 +62,20 @@ export function pushSessionLog(entry: SessionLogEntry, max = 50): SessionLogEntr
 export function clearSessionsLog(): void {
   if (typeof window === "undefined") return;
   window.localStorage.removeItem(STORAGE_KEY);
+  emit();
+}
+
+/** 订阅 sessions log 变更（其他 tab / 同一 tab 推完都会触发） */
+export function subscribeSessionsLog(cb: () => void): () => void {
+  if (typeof window === "undefined") return () => {};
+  const onUpdate = () => cb();
+  // 自定义事件（同 tab 内 pushSessionLog 触发）
+  window.addEventListener(EVENT_NAME, onUpdate);
+  // 原生 storage 事件（其他 tab 修改 localStorage 触发）
+  window.addEventListener("storage", (e) => {
+    if (e.key === STORAGE_KEY) onUpdate();
+  });
+  return () => {
+    window.removeEventListener(EVENT_NAME, onUpdate);
+  };
 }

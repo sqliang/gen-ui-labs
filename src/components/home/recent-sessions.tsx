@@ -5,7 +5,12 @@ import { useEffect, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { LABS } from "@/core/labs";
-import { clearSessionsLog, readSessionsLog, type SessionLogEntry } from "@/core/state/sessions-log";
+import {
+  clearSessionsLog,
+  readSessionsLog,
+  type SessionLogEntry,
+  subscribeSessionsLog,
+} from "@/core/state/sessions-log";
 
 /**
  * 首页"最近会话"——真数据。
@@ -94,9 +99,8 @@ export function RecentSessions() {
     setMounted(true);
 
     // 监听跨页 sessions 更新
-    const onUpdate = () => setEntries(readSessionsLog());
-    window.addEventListener("sessionsLog:updated", onUpdate);
-    return () => window.removeEventListener("sessionsLog:updated", onUpdate);
+    const unsubscribe = subscribeSessionsLog(() => setEntries(readSessionsLog()));
+    return unsubscribe;
   }, []);
 
   const handleClear = () => {
