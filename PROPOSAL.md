@@ -1075,3 +1075,44 @@ done
 - `npm run verify` 全绿：biome ✓ + tsc ✓ + **134 vitest ✓** + next build ✓
 - **7 commits** (§10.7 之后)
 - **0 新依赖**（§3 严格遵守）
+
+## 10.9 W6 收尾 · LLM 真接 json-ui pipeline（2026-06-22 · v0.1.0-w5+3）
+
+> §10.8 之后的关键 LLM 接入工作。
+
+### 已交付
+
+**`/api/json-ui` 真接 deepseek**
+
+- `src/app/api/json-ui/route.ts`：POST 加 `provider="deepseek"` flag
+  - 真调 `getModelProvider("deepseek-chat").stream(...)`
+  - System prompt 限定 deepseek 输出纯 JSON-UI patch 数组（mount/patch/unmount）
+  - Server 累积 text delta → 找 `[...arrStart..arrEnd]` → `JSON.parse` → SSE 流
+  - 无 `DEEPSEEK_API_KEY` 时自动回退 mock scenario
+- `tests/manual/e2e-chat.ts` 加 section [7]（3 断言）
+- 实测：deepseek 输出 6 mount patch 生成完整 greeting card（card root + 5 children with styles）
+
+**`/labs/codegen/json-ui` UI 配套**
+
+- 加 `providerMode` state（mock | deepseek）+ `prompt` state
+- 新 toolbar slot：mock/deepseek 切换 + prompt 输入（mock 模式 disabled）
+- handleStart body 现在传 `provider` + `prompt` 到 fetchSse
+- useCallback deps 更新为 [logSession, markStart, providerMode, prompt]
+
+### 端到端验证
+
+1. 浏览器打开 `/labs/codegen/json-ui`
+2. 切到 deepseek + 输入 prompt（"做一个简单问候卡片"）
+3. 点 加载 JSON-UI → 真 deepseek 输出 patches → JsonUiRenderer 实时渲染
+4. curl 直测 `/api/json-ui` 也能跑（16/16 e2e pass）
+
+### 已知问题
+
+- `/api/ag-ui` + `/api/a2ui` 仍是 mock（可同样设计套用，但 deepseek 输出 AG-UI/A2UI event 复杂度高，W7 考虑）
+- three-pane sub-page 仍用 `/api/json-ui` mock scenario（已可用 deepseek provider 但 UI 没暴露切换）
+
+### 计数
+
+- `npm run verify` 全绿：biome ✓ + tsc ✓ + **134 vitest ✓** + next build ✓
+- **2 commits** (§10.8 之后)
+- **0 新依赖**（§3 严格遵守）
