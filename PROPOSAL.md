@@ -1012,3 +1012,66 @@ done
 - `npm run verify` 全绿：biome ✓ + tsc ✓ + **128 vitest ✓** + next build ✓
 - 11 commits (§10.6 之后)
 - 1 个新 workflow (.github/workflows/verify.yml)
+
+## 10.8 W6 推进 · 深度 / 编排 / 文档（2026-06-22 · v0.1.0-w5+2）
+
+> §10.7 之后的 6 个补充推进。
+
+### 已交付
+
+**IndexedDB sessions-log（opt-in 升级）**
+
+- `src/core/state/sessions-log-db.ts`（228 行）—— 浏览器原生 IndexedDB + localStorage fallback + 自动迁移 + BroadcastChannel 跨 tab
+- `tests/unit/state/sessions-log-db.test.ts`（6 测试）—— 测纯逻辑 (dedupe / newest-first / trim=50 / round-trip)
+- 启用开关：`?idb=1` URL flag 或 localStorage `gen-ui-labs.idb.enabled=true`
+- **不引新依赖**（§3）—— 自己写 IDB 92 行
+
+**真 deepseek e2e 自动化**
+
+- `tests/manual/e2e-chat.ts` 增 section [6]（2 断言）
+  - 真 `/api/chat` 接 deepseek-chat（无 key 自动 skip）
+  - 验证 200 OK + text delta 解析
+- 实测：13/13 e2e pass + 134 vitest pass
+
+**浏览器实测真 deepseek 端到端**
+
+- `/labs/streaming/markdown` 切 api + 开始
+- 模型 badge: `deepseek-chat` ✓
+- 14235 chars / 3451 chunks / first token 1668ms
+- 真 React 待办 demo 代码 + 解释文字 ✓
+
+**A2UI 多 surface 编排 UI**
+
+- `src/app/labs/streaming/a2ui/page.tsx`：
+  - 每个 surface chip = `[name | 🗑]` 拆 button（左边 switch，右边 delete）
+  - 新 `add` 按钮（Plus icon）→ 加 `surface_N`，auto-activate
+  - 新 `clear all` 按钮 → surfaces.size > 1 才显示
+- 3 handlers：`handleAddSurface` / `handleDeleteSurface` / `handleClearAllSurfaces`
+- 浏览器实测：Run → add → surface_1 出现 → delete surface_1 → 回到 1 surface
+
+**⌘K 加 5 个全局 actions**
+
+- `src/components/command-palette.tsx`：
+  - action-go-home (`/`)
+  - action-go-about (`/about`)
+  - action-go-settings (`/settings/models`)
+  - action-scroll-top / action-scroll-bottom
+- 总计 10 actions (5 lab + 3 nav + 2 scroll)
+
+**首页 STATS 更新**
+
+- `src/app/page.tsx`：tests 120→134 / scenarios 5→3 (chart/form/default) / 新 `sub-pages` tile (17 = 13 真 + 4 wip)
+- site-footer: `v0.1.0-w4` → `v0.1.0-w5 · 134 tests · seo + ci + indexeddb ready`
+
+### 已知问题（W6+ 候选）
+
+- 真 deepseek 接入 `/api/ag-ui` `/api/a2ui` `/api/json-ui`（当前是 mock scenarios，prompt 触发不同场景）
+- Lab 2 加 agent 化（tool calling in deepseek 输出）
+- 真 Playwright 浏览器 e2e（§3 不引 dep，可考虑手动 `computer_use` snapshot 测试套）
+- W6 真接 LLM 到 json-ui page（深 deepseek 直出 JSON-UI patch 流）
+
+### 计数
+
+- `npm run verify` 全绿：biome ✓ + tsc ✓ + **134 vitest ✓** + next build ✓
+- **7 commits** (§10.7 之后)
+- **0 新依赖**（§3 严格遵守）
