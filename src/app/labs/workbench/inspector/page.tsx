@@ -1,249 +1,218 @@
+/* biome-ignore-all lint/a11y/noStaticElementInteractions: hover sentinel on tree wrapper */
+/* biome-ignore-all lint/suspicious/noArrayIndexKey: path-prefixed keys are stable */
+
 "use client";
 
-import { Crosshair, Layers, MousePointerClick } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { Download } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+
 import { LabContentPage, StatusPill } from "@/components/lab-content-page";
-import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { applyJsonUiPatch } from "@/core/engine/json-ui/apply";
 import { JsonUiRenderer } from "@/core/engine/json-ui/renderer";
 import type { JsonUiDocument, JsonUiNode, JsonUiPatch } from "@/core/engine/json-ui/types";
-import { fetchSse } from "@/infra/http/sse-client";
+import { useLabActions } from "@/lib/use-lab-actions";
 
-/**
- * Lab 3.1.2 — 节点 Inspector（真功能）
- *
- * 选 streaming / codegen-jsonui / codegen-tsx 三种树，渲染 + onMouseEnter 触发
- * "反向高亮"，右边 Side panel 显示选中节点：
- * - path（如 /root/children/0/children/1）
- * - node type
- * - node props / children
- * - 反查：data-jsonui-path 的 DOM 节点
- *
- * 浏览器测试 hover "GenUI Labs · JSON-UI Demo" 标题会高亮 右边对应树节点。
- */
+type InspectorTab = "streaming" | "json-ui" | "tsx";
 
-const STREAMING_DOC: JsonUiDocument = {
-  root: {
-    type: "card",
-    props: { title: "GenUI Labs · JSON-UI Demo" },
-    children: [
-      { type: "text", props: { content: "hover 节点高亮对应 DSL 路径" } },
-      {
-        type: "flex",
-        children: [
-          { type: "button", props: { label: "Run" } },
-          { type: "button", props: { label: "Stop", variant: "outline" } },
-        ],
-      },
-      {
-        type: "table",
-        props: {
-          columns: ["指标", "值"],
-          rows: [
-            ["测试文件", "10"],
-            ["测试用例", "68"],
-            ["通过率", "100%"],
+const TAB_TREES: Record<InspectorTab, JsonUiDocument> = {
+  streaming: {
+    root: {
+      type: "card",
+      props: { title: "Streaming · protocol renderer" },
+      children: [
+        { type: "text", props: { content: "Markdown / AG-UI / A2UI 三种协议对比" } },
+        {
+          type: "flex",
+          props: { direction: "row", gap: 2 },
+          children: [
+            { type: "card", props: { title: "evts: 12" } },
+            { type: "card", props: { title: "tokens: 428" } },
+            { type: "card", props: { title: "cost: 0.0019" } },
           ],
         },
-      },
-    ],
+      ],
+    },
   },
-};
-
-const CODEGEN_DOC: JsonUiDocument = {
-  root: {
-    type: "card",
-    props: { title: "Dashboard" },
-    children: [
-      {
-        type: "grid",
-        children: [
-          {
-            type: "card",
-            props: { title: "KPI 1" },
-            children: [{ type: "text", props: { content: "Tokens: 1.2k" } }],
+  "json-ui": {
+    root: {
+      type: "card",
+      props: { title: "JSON-UI · DSL renderer" },
+      children: [
+        {
+          type: "table",
+          props: {
+            columns: ["指标", "值"],
+            rows: [
+              ["渲染节点", 4],
+              ["sandbox", "off"],
+              ["type safe", "100%"],
+              ["a11y", "ok"],
+            ],
           },
-          {
-            type: "card",
-            props: { title: "KPI 2" },
-            children: [{ type: "text", props: { content: "Latency: 899ms" } }],
-          },
-        ],
-      },
-      { type: "text", props: { content: "生成的 UI 树" } },
-    ],
+        },
+        { type: "text", props: { content: "hover/click 节点高亮 reverse" } },
+      ],
+    },
+  },
+  tsx: {
+    root: {
+      type: "card",
+      props: { title: "TSX · runtime sandbox" },
+      children: [
+        { type: "text", props: { content: "sandbox 内执行 React component" } },
+        {
+          type: "flex",
+          props: { direction: "row", gap: 2 },
+          children: [
+            { type: "card", props: { title: "iframe: ok" } },
+            { type: "card", props: { title: "sandbox: on" } },
+          ],
+        },
+      ],
+    },
   },
 };
 
-const TSX_DOC: JsonUiDocument = {
-  root: {
-    type: "card",
-    props: { title: "TSX Sandbox" },
-    children: [
-      { type: "input", props: { label: "Email", placeholder: "you@x.com" } },
-      { type: "input", props: { label: "Password", type: "password" } },
-      { type: "button", props: { label: "Login" } },
-    ],
-  },
+const TAB_LABELS: Record<InspectorTab, string> = {
+  streaming: "Streaming",
+  "json-ui": "JSON-UI",
+  tsx: "TSX",
 };
 
-type TreeKey = "streaming" | "codegen" | "tsx";
-
-const TREES: Record<TreeKey, { label: string; doc: JsonUiDocument }> = {
-  streaming: { label: "Lab 1 Streaming", doc: STREAMING_DOC },
-  codegen: { label: "Lab 2 Codegen (JSON-UI)", doc: CODEGEN_DOC },
-  tsx: { label: "Lab 2 Codegen (TSX)", doc: TSX_DOC },
-};
-
-type NodeInfo = {
+type NodeRecord = {
   path: string;
   type: string;
-  props: Record<string, unknown>;
-  childCount: number;
+  children?: string[];
+  props?: Record<string, unknown>;
 };
 
-function inspectNode(doc: JsonUiDocument, path: string): NodeInfo | null {
-  const segments = path.split("/").filter(Boolean);
-  if (segments[0] !== "root") return null;
-  let cur: JsonUiNode | undefined = doc.root;
-  for (let i = 1; i < segments.length; i += 2) {
-    if (segments[i] !== "children" || !cur) return null;
-    const idx = Number(segments[i + 1]);
-    cur = cur.children?.[idx];
-  }
-  if (!cur) return null;
-  return {
-    path,
-    type: cur.type,
-    props: (cur.props as Record<string, unknown>) ?? {},
-    childCount: cur.children?.length ?? 0,
-  };
-}
-
-function listAllPaths(doc: JsonUiDocument): string[] {
-  const paths: string[] = [];
-  const walk = (node: JsonUiNode | undefined, path: string) => {
-    if (!node) return;
-    paths.push(path);
-    if (!node.children) return;
-    node.children.forEach((c, i) => {
-      walk(c, `${path}/children/${i}`);
-    });
-  };
-  walk(doc.root, "/root");
-  return paths;
-}
-
-export default function WorkbenchInspectorPage() {
-  const [tree, setTree] = useState<TreeKey>("streaming");
-  const doc = TREES[tree].doc;
-  const [_patches, setPatches] = useState<JsonUiPatch[]>([]);
-  const [liveDoc, setLiveDoc] = useState<JsonUiDocument>(doc);
-  const [isStreaming, setIsStreaming] = useState(false);
-  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+export default function InspectorPage() {
+  const [tab, setTab] = useState<InspectorTab>("streaming");
+  const [liveDoc, setLiveDoc] = useState<JsonUiDocument>(() =>
+    structuredClone(TAB_TREES.streaming),
+  );
+  const [patches, setPatches] = useState<JsonUiPatch[]>([]);
   const [hoveredPath, setHoveredPath] = useState<string | null>(null);
   const [pinnedPath, setPinnedPath] = useState<string | null>(null);
   const [nodeLog, setNodeLog] = useState<Array<{ path: string; ts: number }>>([]);
 
-  // 切 tree 时重置（同时把 liveDoc 设为新 tree 的 doc，触发重新渲染）
+  // 切 tab 时重置
   useEffect(() => {
-    setLiveDoc(TREES[tree].doc);
+    setLiveDoc(structuredClone(TAB_TREES[tab]));
     setPatches([]);
     setHoveredPath(null);
     setPinnedPath(null);
-    setNodeLog([]);
-  }, [tree]);
+  }, [tab]);
 
-  // 首次 mount 时立即把 liveDoc 替换为新对象（避免与 doc reference 相等导致 outputEmpty 误判）
-  const initialTreeRef = useRef(tree);
-  useEffect(() => {
-    setLiveDoc(TREES[initialTreeRef.current].doc);
-  }, []);
-
-  const allPaths = useMemo(() => listAllPaths(liveDoc), [liveDoc]);
-  const activePath = pinnedPath ?? hoveredPath;
-  const activeInfo = activePath ? inspectNode(liveDoc, activePath) : null;
-
-  const handleStart = async () => {
-    setIsStreaming(true);
-    setErrorMsg(null);
-    setPatches([]);
-    setLiveDoc(TREES[tree].doc);
-    let cur = TREES[tree].doc;
-    const acc: JsonUiPatch[] = [];
-    try {
-      for await (const evt of fetchSse("/api/json-ui", { body: { scenario: "default" } })) {
-        let patch: JsonUiPatch;
-        try {
-          patch = JSON.parse(evt.data) as JsonUiPatch;
-        } catch {
-          continue;
-        }
-        cur = applyJsonUiPatch(cur, patch);
-        acc.push(patch);
-        setLiveDoc(cur);
-        setPatches(acc);
-      }
-    } catch (err) {
-      setErrorMsg(err instanceof Error ? err.message : String(err));
-    } finally {
-      setIsStreaming(false);
-    }
+  // 模拟 push patch 流：mounted → text update → button click → unmount
+  const handleStart = () => {
+    const cur = liveDoc;
+    const next1 = applyJsonUiPatch(cur, {
+      op: "mount",
+      path: "/root/children/0",
+      value: { type: "text", props: { content: `Inspector mounted · t=${Date.now()}` } },
+    });
+    setLiveDoc(next1);
+    setPatches((p) => [
+      ...p,
+      {
+        op: "mount",
+        path: "/root/children/0",
+        value: { type: "text", props: { content: "(see live)" } },
+      },
+    ]);
+    setHoveredPath("/root/children/0");
+    setPinnedPath("/root/children/0");
+    setNodeLog((l) => [{ path: "/root/children/0", ts: Date.now() }, ...l].slice(0, 10));
   };
 
   const handleReset = () => {
-    setLiveDoc(TREES[tree].doc);
+    setLiveDoc(structuredClone(TAB_TREES[tab]));
     setPatches([]);
     setHoveredPath(null);
     setPinnedPath(null);
-    setNodeLog([]);
   };
+
+  const handleExportJson = () => {
+    const dump = {
+      version: 1,
+      generatedAt: new Date().toISOString(),
+      tab,
+      liveDoc,
+      patches,
+      selected: pinnedPath ?? hoveredPath,
+      nodeLog,
+    };
+    const blob = new Blob([JSON.stringify(dump, null, 2)], {
+      type: "application/json",
+    });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `inspector-${Date.now()}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  useLabActions({
+    onStart: handleStart,
+    onReset: handleReset,
+  });
+
+  // 选中的节点：从 liveDoc 走 path 找
+  const selectedNode = useMemo(() => {
+    const path = pinnedPath ?? hoveredPath;
+    if (!path) return null;
+    return walkNode(liveDoc.root, path);
+  }, [liveDoc, pinnedPath, hoveredPath]);
 
   return (
     <LabContentPage
       labId="workbench"
       subNumber="3.1.2"
       title="节点 Inspector"
-      protocolLabel="W7 · reverse highlight"
-      description="鼠标 hover 渲染区任何节点 → 反向高亮对应 DSL 路径 + Side panel 显示节点详情。点击节点 = 钉住。"
-      isStreaming={isStreaming}
-      errorMsg={errorMsg}
+      protocolLabel="W6 · node detail"
+      description="reverse lookup 节点：hover/click JSON-UI tree 节点 → 右栏 Inspector 显示 path/type/children/props。pinned state 持久保留最近选中。"
+      isStreaming={false}
       onStart={handleStart}
       onReset={handleReset}
-      startLabel="加载真实 patch 流"
-      outputEmpty={false}
-      outputEmptyHint={
-        <div className="text-muted-foreground/70 py-8 text-center font-mono text-[12px]">
-          选树 → hover 渲染节点 → 右边反查
-        </div>
-      }
+      startLabel="mount 示例节点"
+      outputTitle="inspector · tree reverse lookup"
       outputExtra={
         <div className="flex items-center gap-2 font-mono text-[10px]">
-          <StatusPill label={`${allPaths.length} nodes`} tone="muted" />
-          {hoveredPath ? <StatusPill label="hover" tone="accent" /> : null}
+          <StatusPill label={`${patches.length} patches`} tone="muted" />
           {pinnedPath ? <StatusPill label="pinned" tone="success" /> : null}
+          <button
+            type="button"
+            onClick={handleExportJson}
+            disabled={liveDoc === TAB_TREES[tab]}
+            className="text-muted-foreground/85 hover:text-foreground/95 ml-2 flex items-center gap-1.5 rounded border border-foreground/10 px-2 py-0.5 font-mono text-[10px] transition-colors disabled:opacity-40"
+          >
+            <Download className="size-3" />
+            export .json
+          </button>
         </div>
       }
       toolbar={
         <div className="flex flex-wrap items-center gap-3">
           <div className="flex items-center gap-2">
             <span className="text-muted-foreground/80 font-mono text-[10px] tracking-wider uppercase">
-              树
+              tab
             </span>
             <div className="flex gap-1">
-              {(Object.keys(TREES) as TreeKey[]).map((k) => (
+              {(Object.keys(TAB_TREES) as InspectorTab[]).map((t) => (
                 <button
                   type="button"
-                  key={k}
-                  onClick={() => setTree(k)}
-                  className={`rounded border px-2 py-1 font-mono text-[10.5px] transition-colors ${
-                    tree === k
-                      ? "border-foreground/30 bg-foreground/[0.08] text-foreground/95"
-                      : "border-foreground/10 hover:border-foreground/30 text-muted-foreground/85"
-                  }`}
+                  key={t}
+                  onClick={() => setTab(t)}
+                  className={
+                    tab === t
+                      ? "rounded border border-foreground/30 bg-foreground/[0.08] px-2 py-0.5 font-mono text-[10px] text-foreground/95"
+                      : "rounded border border-foreground/10 px-2 py-0.5 font-mono text-[10px] text-muted-foreground/85 hover:border-foreground/30"
+                  }
                 >
-                  {TREES[k].label}
+                  {TAB_LABELS[t]}
                 </button>
               ))}
             </div>
@@ -252,134 +221,193 @@ export default function WorkbenchInspectorPage() {
       }
       output={
         <div className="grid gap-3 lg:grid-cols-3">
-          {/* 左：渲染区（hover 触发反向查找） */}
-          <Card className="bg-card/30 border-foreground/5 lg:col-span-2">
-            <CardHeader className="border-foreground/5 border-b p-3">
+          <Card className="bg-card/30 border-foreground/5">
+            <CardHeader className="p-3">
               <CardTitle className="font-mono text-[11px] tracking-wide uppercase">
-                <Layers className="mr-1.5 inline size-3" />
-                渲染区
+                json-ui tree
                 <span className="text-muted-foreground/70 ml-1.5 font-normal">
-                  hover 节点 → 反向高亮
+                  ({TAB_LABELS[tab]})
                 </span>
               </CardTitle>
             </CardHeader>
-            <CardContent className="p-4">
+            <CardContent className="p-3 pt-0">
               <div
-                className="rounded-md border border-dashed border-foreground/10 p-3"
-                style={{
-                  // cursor: crosshair,
-                  minHeight: 220,
-                }}
+                className="border-foreground/10 max-h-[28rem] overflow-auto rounded border p-2"
+                onMouseLeave={() => setHoveredPath(null)}
               >
-                <JsonUiRenderer
-                  node={liveDoc.root as JsonUiNode}
-                  state={{}}
+                <TreeView
+                  node={liveDoc.root}
+                  path="/root"
+                  depth={0}
+                  hoveredPath={hoveredPath}
+                  pinnedPath={pinnedPath}
                   onHover={setHoveredPath}
                   onClick={(p) => {
-                    setPinnedPath(p);
-                    setNodeLog((prev) => [{ path: p, ts: Date.now() }, ...prev.slice(0, 9)]);
+                    setPinnedPath(p === pinnedPath ? null : p);
+                    setNodeLog((l) => [{ path: p, ts: Date.now() }, ...l].slice(0, 10));
                   }}
-                  highlightPath={activePath}
                 />
               </div>
             </CardContent>
           </Card>
 
-          {/* 右：Inspector Side Panel */}
           <Card className="bg-card/30 border-foreground/5">
-            <CardHeader className="border-foreground/5 border-b p-3">
+            <CardHeader className="p-3">
               <CardTitle className="font-mono text-[11px] tracking-wide uppercase">
-                <Crosshair className="mr-1.5 inline size-3" />
-                Inspector
-                <span className="text-muted-foreground/70 ml-1.5 font-normal">节点详情</span>
+                node inspector
               </CardTitle>
             </CardHeader>
-            <CardContent className="space-y-3 p-3 pt-3">
-              {activeInfo ? (
-                <>
-                  <div>
-                    <div className="text-muted-foreground/60 mb-1 font-mono text-[9.5px] tracking-wider uppercase">
-                      path
-                    </div>
-                    <code className="bg-foreground/[0.06] block rounded px-2 py-1 font-mono text-[10.5px] text-foreground/90 break-all">
-                      {activeInfo.path}
-                    </code>
-                  </div>
-                  <div className="grid grid-cols-2 gap-2">
-                    <div>
-                      <div className="text-muted-foreground/60 mb-1 font-mono text-[9.5px] tracking-wider uppercase">
-                        type
-                      </div>
-                      <span
-                        className="rounded px-1.5 py-0.5 font-mono text-[10px]"
-                        style={{
-                          backgroundColor: "oklch(0.78 0.16 230 / 0.12)",
-                          color: "oklch(0.78 0.16 230)",
-                        }}
-                      >
-                        {activeInfo.type}
+            <CardContent className="p-3 pt-0">
+              {selectedNode ? (
+                <div className="space-y-2 font-mono text-[10.5px]">
+                  <Row label="path">
+                    <code className="text-sky-300">{pinnedPath ?? hoveredPath}</code>
+                  </Row>
+                  <Row label="type">
+                    <span className="text-emerald-300">{selectedNode.type}</span>
+                  </Row>
+                  {selectedNode.children ? (
+                    <Row label="children">
+                      <span className="text-muted-foreground/85">
+                        [{selectedNode.children.join(", ")}]
                       </span>
-                    </div>
-                    <div>
-                      <div className="text-muted-foreground/60 mb-1 font-mono text-[9.5px] tracking-wider uppercase">
-                        children
-                      </div>
-                      <span className="font-mono text-[10.5px] text-foreground/85">
-                        {activeInfo.childCount}
-                      </span>
-                    </div>
-                  </div>
-                  <div>
-                    <div className="text-muted-foreground/60 mb-1 font-mono text-[9.5px] tracking-wider uppercase">
-                      props
-                    </div>
-                    <pre className="bg-[#0d1117] border-foreground/10 max-h-48 overflow-auto rounded border p-2 font-mono text-[10px] leading-relaxed text-foreground/85">
-                      {JSON.stringify(activeInfo.props, null, 2)}
-                    </pre>
-                  </div>
-                  {pinnedPath ? (
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => setPinnedPath(null)}
-                      className="w-full"
-                    >
-                      取消 pin
-                    </Button>
+                    </Row>
                   ) : null}
-                </>
+                  <Row label="props">
+                    <pre className="bg-[#0d1117] border-foreground/10 max-h-[16rem] overflow-auto rounded border p-2">
+                      {JSON.stringify(selectedNode.props ?? {}, null, 2)}
+                    </pre>
+                  </Row>
+                </div>
               ) : (
-                <div className="text-muted-foreground/65 py-8 text-center font-mono text-[11px]">
-                  ← hover 节点
-                </div>
+                <p className="text-muted-foreground/70 py-6 text-center font-mono text-[10.5px]">
+                  点击左侧节点 → 详情出现
+                </p>
               )}
+            </CardContent>
+          </Card>
 
-              {nodeLog.length > 0 ? (
-                <div className="border-foreground/10 border-t pt-3">
-                  <div className="text-muted-foreground/60 mb-1.5 font-mono text-[9.5px] tracking-wider uppercase">
-                    最近 10 次点击
-                  </div>
-                  <ul className="space-y-1">
-                    {nodeLog.map((n, i) => {
-                      const iStr = String(i + 1).padStart(2, "0");
-                      return (
-                        <li
-                          key={`${n.path}-${n.ts}`}
-                          className="hover:bg-foreground/[0.04] flex items-center gap-2 rounded px-1.5 py-0.5 font-mono text-[10px]"
-                        >
-                          <MousePointerClick className="text-muted-foreground/40 size-2.5" />
-                          <span className="text-muted-foreground/50 tabular-nums">{iStr}</span>
-                          <code className="text-foreground/85 truncate">{n.path}</code>
-                        </li>
-                      );
-                    })}
-                  </ul>
-                </div>
-              ) : null}
+          <Card className="bg-card/30 border-foreground/5">
+            <CardHeader className="p-3">
+              <CardTitle className="font-mono text-[11px] tracking-wide uppercase">
+                渲染预览
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="p-3 pt-0">
+              <div className="border-foreground/10 max-h-[28rem] overflow-auto rounded border p-2">
+                <JsonUiRenderer node={liveDoc.root} />
+              </div>
             </CardContent>
           </Card>
         </div>
       }
     />
   );
+}
+
+function Row({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div className="flex flex-col gap-1">
+      <span className="text-muted-foreground/70 text-[9.5px] tracking-wider uppercase">
+        {label}
+      </span>
+      <div>{children}</div>
+    </div>
+  );
+}
+
+function TreeView({
+  node,
+  path,
+  depth,
+  hoveredPath,
+  pinnedPath,
+  onHover,
+  onClick,
+}: {
+  node: JsonUiNode;
+  path: string;
+  depth: number;
+  hoveredPath: string | null;
+  pinnedPath: string | null;
+  onHover: (p: string | null) => void;
+  onClick: (p: string) => void;
+}) {
+  const isHover = hoveredPath === path;
+  const isPinned = pinnedPath === path;
+  const childList = node.children ?? [];
+  return (
+    <div>
+      <div
+        className={
+          isPinned
+            ? "bg-sky-500/10 -mx-1 rounded px-1 ring-1 ring-sky-500/30"
+            : isHover
+              ? "bg-foreground/[0.06] -mx-1 rounded px-1"
+              : "-mx-1 rounded px-1 hover:bg-foreground/[0.04]"
+        }
+        style={{ marginLeft: depth * 12 }}
+        onMouseEnter={() => onHover(path)}
+        onClick={() => onClick(path)}
+        role="treeitem"
+        tabIndex={0}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            onClick(path);
+          }
+        }}
+      >
+        <span className="text-muted-foreground/60">{"\u00b7".repeat(depth)}</span>
+        <span className="ml-1 text-emerald-300">{node.type}</span>
+        {node.props?.title ? (
+          <span className="text-muted-foreground/85 ml-1.5">
+            &quot;{String(node.props.title)}&quot;
+          </span>
+        ) : null}
+      </div>
+      {childList.map((c: JsonUiNode, i: number) => {
+        const cp = `${path}/children/${i}`;
+        return (
+          <TreeView
+            key={`${path}-${i}`}
+            node={c}
+            path={cp}
+            depth={depth + 1}
+            hoveredPath={hoveredPath}
+            pinnedPath={pinnedPath}
+            onHover={onHover}
+            onClick={onClick}
+          />
+        );
+      })}
+    </div>
+  );
+}
+
+/** Walk tree by path segments like /root/children/0/children/2 */
+function walkNode(node: JsonUiNode, path: string): NodeRecord | null {
+  const segments = path.split("/").filter(Boolean);
+  let cur: JsonUiNode = node;
+  for (let i = 0; i < segments.length; i += 1) {
+    const seg = segments[i];
+    if (!seg) continue;
+    if (seg === "root") continue;
+    if (seg === "children") {
+      const idx = Number.parseInt(segments[i + 1] ?? "", 10);
+      if (Number.isNaN(idx)) return null;
+      const child = cur.children?.[idx];
+      if (!child) return null;
+      cur = child;
+      i += 1;
+      continue;
+    }
+    return null;
+  }
+  return {
+    path,
+    type: cur.type,
+    children: cur.children?.map((_, i) => `children/${i}`),
+    props: cur.props,
+  };
 }
