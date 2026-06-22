@@ -1,17 +1,36 @@
 /**
- * /api/json-ui 路由（W6 mock）。
+ * /api/json-ui 路由（W6 mock + W6 末 deepseek 真接）。
  *
  * 返回 JSON-UI DSL 的 SSE 流。
  * 每行 data 是一个 JsonUiPatch（增量），客户端累积构建 JsonUiDocument。
+ *
+ * W6 末：当 body.provider === "deepseek" 时，
+ * 真调 deepseek-chat 让 LLM 输出 JSON-UI patch JSON 数组，
+ * server 解析后转 SSE 流。无 key 时自动回退 mock。
  */
 
 import type { JsonUiPatch } from "@/core/engine/json-ui/types";
+import { getModelProvider } from "@/core/models";
 
 export const dynamic = "force-dynamic";
+export const runtime = "nodejs"; // fetch + deepseek API call
 
 function sseLine(patch: JsonUiPatch): string {
   return `data: ${JSON.stringify(patch)}\n\n`;
 }
+
+const DEEPSEEK_SYSTEM_PROMPT = `You are a JSON-UI patch generator. Output ONLY a valid JSON array of patches.
+
+Schema (each element is one patch):
+- mount: {"op":"mount","path":"/root/children/N","value":{"type":"...","props":{...}}}
+- patch: {"op":"patch","path":"/root/...","value":{...}}
+- unmount: {"op":"unmount","path":"/root/children/N"}
+
+Available node types: card, text, button, grid, flex, table, chart, input, badge, divider.
+Rules:
+1. First patch must mount /root (card or grid)
+2. Build a meaningful UI (4-8 patches total)
+3. Output ONLY the JSON array, no markdown fences, no preamble`;
 
 const MOCK_PATCHES_DEFAULT: JsonUiPatch[] = [
   {
@@ -218,12 +237,26 @@ function pickScenario(scenario: unknown): JsonUiPatch[] {
 
 export async function POST(request: Request): Promise<Response> {
   let scenario: unknown = "default";
+  let provider: unknown = "mock";
+  let prompt = "";
   try {
-    const body = (await request.json()) as { scenario?: unknown };
+    const body = (await request.json()) as {
+      scenario?: unknown;
+      provider?: unknown;
+      prompt?: unknown;
+    };
     if (typeof body.scenario === "string") scenario = body.scenario;
+    if (typeof body.provider === "string") provider = body.provider;
+    if (typeof body.prompt === "string") prompt = body.prompt;
   } catch {
-    // no body or invalid JSON → default
+    // no body or invalid JSON → defaults
   }
+
+  // 真 deepseek 路径
+  if (provider === "deepseek" && process.env.DEEPSEEK_API_KEY) {
+    return await deepseekStream(request, prompt);
+  }
+
   const patches = pickScenario(scenario);
   const stream = new ReadableStream<Uint8Array>({
     start(controller) {
@@ -232,6 +265,92 @@ export async function POST(request: Request): Promise<Response> {
         controller.enqueue(encoder.encode(sseLine(patch)));
       }
       controller.close();
+    },
+  });
+
+  return new Response(stream, {
+    status: 200,
+    headers: {
+      "content-type": "text/event-stream",
+      "cache-control": "no-cache, no-transform",
+      connection: "keep-alive",
+    },
+  });
+}
+
+async function deepseekStream(request: Request, prompt: string): Promise<Response> {
+  const encoder = new TextEncoder();
+  const stream = new ReadableStream<Uint8Array>({
+    async start(controller) {
+      try {
+        const provider = getModelProvider("deepseek-chat");
+        if (!provider) {
+          controller.enqueue(
+            encoder.encode(
+              sseLine({
+                op: "patch",
+                path: "/root",
+                value: { type: "text", props: { content: "deepseek provider not found" } },
+              }),
+            ),
+          );
+          controller.close();
+          return;
+        }
+        let accumulated = "";
+        for await (const chunk of provider.stream(
+          {
+            model: "deepseek-chat",
+            messages: [
+              { role: "system", content: DEEPSEEK_SYSTEM_PROMPT },
+              { role: "user", content: prompt || "生成一个简单的卡片 UI" },
+            ],
+          },
+          request.signal,
+        )) {
+          if (chunk.kind === "text") {
+            accumulated += chunk.delta;
+          }
+        }
+
+        // 解析 deepseek 输出 —— 找 JSON 数组边界
+        const arrStart = accumulated.indexOf("[");
+        const arrEnd = accumulated.lastIndexOf("]");
+        if (arrStart === -1 || arrEnd === -1) {
+          controller.enqueue(
+            encoder.encode(
+              sseLine({
+                op: "patch",
+                path: "/root",
+                value: {
+                  type: "text",
+                  props: { content: `deepseek 返回无 JSON 数组：${accumulated.slice(0, 80)}` },
+                },
+              }),
+            ),
+          );
+          controller.close();
+          return;
+        }
+        const json = accumulated.slice(arrStart, arrEnd + 1);
+        const parsed = JSON.parse(json) as JsonUiPatch[];
+        for (const patch of parsed) {
+          controller.enqueue(encoder.encode(sseLine(patch)));
+        }
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        controller.enqueue(
+          encoder.encode(
+            sseLine({
+              op: "patch",
+              path: "/root",
+              value: { type: "text", props: { content: `deepseek error: ${msg}` } },
+            }),
+          ),
+        );
+      } finally {
+        controller.close();
+      }
     },
   });
 

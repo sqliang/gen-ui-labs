@@ -161,6 +161,40 @@ async function main(): Promise<void> {
     assert("got text delta", text.length > 0, `len=${text.length} sample="${text.slice(0, 40)}"`);
   }
 
+  // 7. /api/json-ui deepseek provider
+  console.log("\n[7] /api/json-ui deepseek provider (skipped if no key)");
+  if (!dsKey) {
+    console.log("  ⊘ skip — DEEPSEEK_API_KEY not configured");
+  } else {
+    const res7 = await fetch(`${BASE}/api/json-ui`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ provider: "deepseek", prompt: "做一个简单问候卡片" }),
+    });
+    assert("200 OK", res7.status === 200, `status=${res7.status}`);
+    const body7 = await res7.text();
+    const patches7 = body7
+      .split("\n\n")
+      .filter((l) => l.startsWith("data: "))
+      .map((l) => JSON.parse(l.slice(6)));
+    assert(
+      "≥3 JSON-UI patches",
+      patches7.length >= 3,
+      `got ${patches7.length}`,
+    );
+    const rootMount = patches7.find(
+      (p: { op: string; path: string; value?: { type?: string } }) =>
+        p.op === "mount" &&
+        (p.path === "/root" || p.path === "/root/children/0") &&
+        p.value?.type,
+    );
+    assert(
+      "has at least one mount with type",
+      Boolean(rootMount),
+      `first mount=${JSON.stringify(patches7[0]).slice(0, 80)}`,
+    );
+  }
+
   // summary
   const passed = results.filter((r) => r.pass).length;
   const failed = results.length - passed;
