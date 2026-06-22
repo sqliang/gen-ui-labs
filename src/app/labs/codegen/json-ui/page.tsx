@@ -58,6 +58,8 @@ export default function JsonUiPage() {
   const [patches, setPatches] = useState<JsonUiPatch[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [providerMode, setProviderMode] = useState<"mock" | "deepseek">("mock");
+  const [prompt, setPrompt] = useState("做一个简单问候卡片");
   // session 完成后写入 sessionsLog
   const { markStart, logSession } = useLogSession({
     lab: "codegen",
@@ -77,7 +79,9 @@ export default function JsonUiPage() {
       root: { type: "text", props: { content: "加载中…" } },
     };
     try {
-      for await (const evt of fetchSse("/api/json-ui", { body: {} })) {
+      for await (const evt of fetchSse("/api/json-ui", {
+        body: { provider: providerMode, prompt },
+      })) {
         let patch: JsonUiPatch;
         try {
           patch = JSON.parse(evt.data) as JsonUiPatch;
@@ -106,7 +110,7 @@ export default function JsonUiPage() {
       setIsLoading(false);
       logSession();
     }
-  }, [logSession, markStart]);
+  }, [logSession, markStart, providerMode, prompt]);
 
   const handleReset = useCallback(() => {
     setIsLoading(false);
@@ -147,6 +151,45 @@ export default function JsonUiPage() {
       errorMsg={errorMsg}
       onStart={handleStart}
       startLabel="加载 JSON-UI"
+      toolbar={
+        <div className="flex flex-wrap items-center gap-3 rounded-md border border-foreground/10 bg-foreground/[0.02] px-3 py-2">
+          <div className="flex items-center gap-1">
+            <span className="text-muted-foreground/70 font-mono text-[10px] uppercase tracking-wider">
+              provider
+            </span>
+            <button
+              type="button"
+              onClick={() => setProviderMode("mock")}
+              className={
+                providerMode === "mock"
+                  ? "rounded px-2 py-0.5 font-mono text-[10px] bg-primary text-primary-foreground"
+                  : "rounded px-2 py-0.5 font-mono text-[10px] text-muted-foreground hover:text-foreground"
+              }
+            >
+              mock
+            </button>
+            <button
+              type="button"
+              onClick={() => setProviderMode("deepseek")}
+              className={
+                providerMode === "deepseek"
+                  ? "rounded px-2 py-0.5 font-mono text-[10px] bg-primary text-primary-foreground"
+                  : "rounded px-2 py-0.5 font-mono text-[10px] text-muted-foreground hover:text-foreground"
+              }
+            >
+              deepseek
+            </button>
+          </div>
+          <input
+            type="text"
+            value={prompt}
+            onChange={(e) => setPrompt(e.target.value)}
+            placeholder="prompt for deepseek mode"
+            disabled={providerMode === "mock"}
+            className="border-foreground/15 bg-foreground/[0.02] placeholder:text-muted-foreground/40 focus-visible:border-foreground/30 min-w-0 flex-1 rounded border px-2 py-0.5 font-mono text-[11px] focus-visible:outline-none disabled:opacity-50"
+          />
+        </div>
+      }
       outputTitle="json-ui · live document"
       outputExtra={
         <>

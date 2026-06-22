@@ -177,16 +177,10 @@ async function main(): Promise<void> {
       .split("\n\n")
       .filter((l) => l.startsWith("data: "))
       .map((l) => JSON.parse(l.slice(6)));
-    assert(
-      "≥3 JSON-UI patches",
-      patches7.length >= 3,
-      `got ${patches7.length}`,
-    );
+    assert("≥3 JSON-UI patches", patches7.length >= 3, `got ${patches7.length}`);
     const rootMount = patches7.find(
       (p: { op: string; path: string; value?: { type?: string } }) =>
-        p.op === "mount" &&
-        (p.path === "/root" || p.path === "/root/children/0") &&
-        p.value?.type,
+        p.op === "mount" && (p.path === "/root" || p.path === "/root/children/0") && p.value?.type,
     );
     assert(
       "has at least one mount with type",
