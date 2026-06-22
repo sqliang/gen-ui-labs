@@ -33,7 +33,7 @@ export function SiteHeader() {
         <Logo />
         <span className="hidden items-center gap-1.5 font-mono text-[10px] text-muted-foreground sm:flex">
           <span className="size-1.5 animate-pulse rounded-full bg-emerald-500 shadow-[0_0_8px_oklch(0.7_0.18_150)]" />
-          v0.1 · w4
+          v0.1 · w5
         </span>
         <Separator orientation="vertical" className="hidden h-4 bg-white/10 sm:block" />
         <PrimaryNav />

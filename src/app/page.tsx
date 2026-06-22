@@ -16,7 +16,7 @@ const STATS = [
     value: String(BUILTIN_MODELS.length),
     hint: `${PROVIDER_COUNT} 个 provider`,
   },
-  { label: "tests", value: "68", hint: "vitest · green" },
+  { label: "tests", value: "120", hint: "vitest · green" },
   { label: "scenarios", value: "5", hint: "long · tools · error · reconnect · default" },
 ] as const;
 
@@ -57,7 +57,7 @@ export default function HomePage() {
             <div className="mb-6 flex items-center gap-2 font-mono text-[11px]">
               <span className="border-border/40 bg-secondary/30 text-foreground/80 inline-flex items-center gap-1.5 rounded-md border px-2 py-1">
                 <span className="size-1.5 animate-pulse rounded-full bg-emerald-500 shadow-[0_0_8px_oklch(0.7_0.18_150)]" />
-                v0.1 · w4 active
+                v0.1 · w5 active
               </span>
               <span className="text-muted-foreground/70 hidden sm:inline">
                 next.js 16 · react 19 · zustand 5 · deepseek real-sse verified
