@@ -758,6 +758,93 @@ npm run verify
 
 ---
 
+## 10.6 W5 协议深化 + Lab 3/4 真功能（2026-06-21 · v0.1.0-w5）
+
+> 本节在 §10.5 基础上推进 W5 协议层深化，并把 Lab 3/4 共 8 个子页从骨架升级为真功能。
+
+### W5 协议层
+
+**RenderableEvent 生命周期元数据**（`core/protocols/common/lifecycle.ts`）
+
+- `EventMeta = { seq, ts, sessionId, source: 'mock'|'api', runId }`
+- `EnrichedRenderableEvent = RenderableEvent & { _meta: EventMeta }`
+- `createRunMeta({ source, model, prompt })` —— djb2 hash 生成 sessionId + runId
+- `makeEnricher(run)` —— closure 累加 seq；`enrichAll(run, events)` 一键包装
+- 12 个单测（lifecycle.test.ts）覆盖 hash 稳定性 / seq 闭包 / 跨 enricher 隔离
+
+**AG-UI stateful adapter**（`core/protocols/ag-ui/mapper.ts`）
+
+- 合并 TOOL_CALL_START / ARGS / END → 单个完整 tool chunk（name + args + result）
+- STATE_SNAPSHOT 覆盖 buffer，STATE_DELTA 累积 path → value
+- `StatefulAdapterSink` 接口：`onTool / onState / onMeta` 三个回调
+- `createAguiStatefulAdapter(sink?)` —— 双签名
+- 10 个单测覆盖 lifecycle 合并 / 错误传播 / sink 回调
+
+**A2UI stateful adapter**（`core/protocols/a2ui/mapper.ts`）
+
+- 多 surface 树 + 增量 mount/patch + dataModel 浅 merge + 嵌套 path
+- `snapshot()` 返回 `Map<surfaceId, A2uiSurfaceState>`（深拷贝）
+- 13 个单测覆盖多 surface 隔离 / dismiss unmount / 嵌套 path
+
+**JSON-UI apply 核心**（`core/engine/json-ui/apply.ts`）
+
+- `applyJsonUiPatch(doc, patch)` 前后端共用
+- 修 3 个真 bug：
+  - mount 单层 children path 解析错（i 步进 2 假设多嵌套）
+  - patchNode mutate 原 doc 而非 clone（违反不可变）
+  - 终点判定错（应为 `i + 2 === segments.length`，不是 `i === segments.length - 1`）
+- 17 个单测（json-ui-apply.test.ts）
+
+### Lab 3 Workbench 真功能（4/4）
+
+| 子页 | 真功能 | 关键设计 |
+|---|---|---|
+| 3.1.1 Three-pane | 3 栏 CSS Grid + scenario chips + 模拟 SSE 流 + 实时 JsonUiRenderer | 0 新依赖；applyJsonUiPatch 实时同步 |
+| 3.1.2 Inspector | 3 树切换 + onHover 节点高亮 DSL 源码 + 钉住 + 节点 props 详情 | PathWrap 注入 data-jsonui-path + PathCtx |
+| 3.1.3 Heatmap | 3 kind（ERROR/WARN/INFO）+ severity 0-1 + 模拟事件流 | 复用 renderer data-jsonui-path |
+| 3.1.4 Replay | 12 mock patches + scrubber + 6 按钮 + 速度 0.5x-4x + 导出导入 JSON dump | Blob URL + FileReader |
+
+### Lab 4 Observability 真功能（4/4）
+
+| 子页 | 真功能 | 关键设计 |
+|---|---|---|
+| 4.1.1 Tokens | 4 KPI + 2 SVG 图表 + 模型成本表 + 速度 0.5x-2x | 6 颜色 provider 调色板；cost = prompt/1M × costIn + completion/1M × costOut |
+| 4.1.2 Tools | 3 栏（waterfall + raw events + inspector）+ createAguiStatefulAdapter 真接 | ToolStatus 3 态；MOCK_EVENTS 3 calls / 10 raw events |
+| 4.1.3 Reasoning | 3 patterns（CoT / ReAct / Plan）+ SVG DAG 自动布局 + scrubber + 导出 .md | 手写最长路径 BFS 算 layer + Y 偏移（不引 react-flow） |
+| 4.1.4 Score | prompt select + 13 model 切换 + 4 维启发式评分 + SVG 雷达图 + 横向对比表 | djb2 hash 派生 deterministic mock；4 维 0-10 评分 |
+
+### Model registry 升级
+
+- `ModelInfo` 加 `costPerMillionInput` / `costPerMillionOutput` 字段
+- 13 个 BUILTIN_MODELS 加 2026 实际 USD 价格（gpt-4o-mini \$0.15/\$0.60, claude-sonnet-4-5 \$3/\$15 等）
+- Ollama 本地 = \$0（无 API 成本）
+
+### JsonUiRenderer 升级
+
+- 注入 `data-jsonui-path` attribute on every node（`PathWrap` 包装）
+- 暴露 `PathCtx` Context（`onHover` / `onSelect` / `highlightPath`）
+- a11y `role="treeitem"` for table / chart
+
+### 验证
+
+```
+npm run verify
+  ✓ biome check .         (120 files)
+  ✓ tsc --noEmit          (0 errors)
+  ✓ vitest run            (14 files / 120 tests)  ← 68 → 120
+  ✓ next build            (30 routes)
+```
+
+### 已知尾巴（留给 W6+）
+
+1. JSON-UI chart 节点真渲染后 mock 数据 applyPatch 数组 path 仍偶发不出图（mount 行为需重测）
+2. A2UI 多 surface 状态切换的 UI 还差一个"切 surface 标签"控件
+3. Lab 3 / Lab 4 8 个子页的导出功能（heat md / score csv / trace json）只 tokens/reasoning/score 做了
+4. sessionsLog 升级到 IndexedDB（仍 localStorage，W9 计划）
+5. W5 ToolChunk.error 字段加在 v0.1.0-w5，旧版 server 不发这个字段时单元测试需 mock
+
+---
+
 
 ## 7. 你可以选的下一步
 
