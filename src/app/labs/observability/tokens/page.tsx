@@ -1,6 +1,6 @@
 "use client";
 
-import { Coins, Sparkles, Timer, Wallet } from "lucide-react";
+import { Coins, Download, Sparkles, Timer, Wallet } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import { LabContentPage, StatusPill } from "@/components/lab-content-page";
@@ -109,6 +109,29 @@ export default function TokensPage() {
     setSessions([]);
   };
 
+  const handleExportCsv = () => {
+    const header = "model,provider,calls,prompt_tokens,completion_tokens,cost_usd,avg_ttft_ms\n";
+    const rows = Array.from(byModel.entries())
+      .map(([id, agg]) => {
+        const m = BUILTIN_MODELS.find((x) => x.id === id);
+        const provider = m?.provider ?? "?";
+        const calls = agg.count;
+        const prompt = agg.prompt;
+        const completion = agg.completion;
+        const cost = agg.cost;
+        const ttft = calls > 0 ? Math.round(agg.ttftSum / calls) : 0;
+        return [id, provider, calls, prompt, completion, cost.toFixed(6), ttft].join(",");
+      })
+      .join("\n");
+    const blob = new Blob([header + rows], { type: "text/csv" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `tokens-${Date.now()}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
   // 聚合：按 model
   const byModel = useMemo(() => {
     const m = new Map<
@@ -186,6 +209,15 @@ export default function TokensPage() {
         <div className="flex items-center gap-2 font-mono text-[10px]">
           <StatusPill label={`${totals.count} calls`} tone="muted" />
           {isStreaming ? <StatusPill label="● live" tone="success" /> : null}
+          <button
+            type="button"
+            onClick={handleExportCsv}
+            disabled={sessions.length === 0}
+            className="text-muted-foreground/85 hover:text-foreground/95 ml-2 flex items-center gap-1.5 rounded border border-foreground/10 px-2 py-0.5 font-mono text-[10px] transition-colors disabled:opacity-40"
+          >
+            <Download className="size-3" />
+            export .csv
+          </button>
         </div>
       }
       toolbar={
