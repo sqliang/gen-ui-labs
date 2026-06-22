@@ -940,3 +940,75 @@ done
 1. TypeScript 6.0.3 在文档 §8 标注但**实际未升**（Next16 类型约束）。下次 Next.js 17 GA 时统一升。
 2. ESLint 仍装在 `node_modules`（因为 `eslint-config-next` 装过），但 `package.json` 已移除依赖、`biome.json` 是唯一定义。等下次 `npm prune` 自动清理。
 3. shadcn/ui 没走 `npx shadcn@latest init` 流程（因为目录非空 + 避免交互），改为手写 `components.json` + 4 个基础组件。后续用 `npx shadcn@latest add <component>` 加新组件。
+
+## 10.7 W5 收尾 · SEO / CI / Heatmap outline（2026-06-22 · v0.1.0-w5+1）
+
+> §10.6 写完后，w5 尾巴 + 3 个新工作的收尾。
+
+### 已交付
+
+**SEO 全套（站点级）**
+
+- `src/app/layout.tsx` metadata 升级：`metadataBase` + `title: { default, template }` + 11 keywords + OpenGraph + Twitter card + robots
+- `src/app/sitemap.ts`（新建 46 行）—— MetadataRoute.Sitemap，**从 `core/labs.ts` 派生**（加 Lab 自动同步，不硬编码）
+- `src/app/robots.ts`（新建 18 行）—— allow `/`、disallow `/api/` `/_next/`、host + sitemap ref
+- 4 个 Lab hub page metadata：Streaming / Codegen / Workbench / Observability
+- `src/app/settings/models/metadata.ts`（新建 8 行）—— 因为 models/page.tsx 是 `"use client"`，Next.js 禁 metadata export
+- 16 个 sibling `layout.tsx`（13 sub-page + 3 已存在的占位）—— 同样原因，sub-page 是 client component，metadata 必须在 server-only layout
+- `src/app/not-found.tsx` —— 加 metadata + 改 `import { LABS } from "@/core/labs"` 去掉 26 行 hardcode
+- `src/app/opengraph-image.tsx`（新建 131 行）—— ImageResponse 1200×630 PNG，brand row + title + subtitle + 4 Lab pills（蓝/紫/琥珀/绿 outline）
+- `src/app/twitter-image.tsx`（新建）—— centered layout 适配 Twitter 裁切
+- `src/app/icon.tsx`（新建）—— 32×32 PNG 4 个方块 favicon，对应 site-header SVG
+
+**OG 图坑（真排查）**
+
+- Satori（next/og 底层）**不带 CJK 字体**：给中文 → `failed to pipe response` (HTTP 502)
+- **解法**：OG 图用英文 + 6 位 hex 色（不用 oklch），真中文显示用网站本身
+- 拒绝引入 CJK 字体（`fetch` 远程文件违反 §3 不引新依赖）
+- 实测：`HTTP 200, 67KB PNG` + vision 看到 4 颜色 pill 正确
+
+**CI（自动化）**
+
+- `.github/workflows/verify.yml`（新建 35 行）—— Ubuntu + Node 22 + `npm ci` + `npm run verify` + 失败时上传 `.next/` artifacts
+- 触发：push to main + 所有 PR
+- 12 min timeout（next build 是长尾）
+
+**Heatmap PathWrap severity outline（真 bug 修）**
+
+- `core/engine/json-ui/renderer.tsx`：+ `PathContext.outlineForPath` + `JsonUiRenderer` prop + PathWrap 渲染 absolute span with className
+- `labs/workbench/heatmap/page.tsx`：用 outlineForPath API（rose/amber/sky 3 色 + alpha 透明度），删 50 行 inline overlay div（`display: none` 假数据载体）
+- 旧实现注释说"实际 outline 由 PathWrap 通过 ctx 渲染"，但 ctx API 从未实现
+- 修后：heatmap severity 真渲染在每个 JSON-UI 节点
+
+**Lab 3/4 子页导出补全**
+
+| 子页 | 导出 | commit |
+| --- | --- | --- |
+| score | `score-<ts>.csv` | `32b2c15` |
+| tools | `tools-trace-<ts>.json` | `2d15e8b` |
+| tokens | `tokens-<ts>.csv` | `08ab157` |
+| heatmap | `heatmap-report-<ts>.md` | `63b99a4` |
+| inspector | `inspector-dump-<ts>.json` | `b24c6e4` |
+| reasoning | `reasoning-<ts>.md`（W5） | `4e895b3` |
+| replay | `replay-<ts>.json`（W5） | `623f649` |
+| tokens.tools | （W5） | `936161d` / `61a92e0` |
+
+**其它**
+
+- `core/state/sessions-log.ts` —— 加 `EVENT_NAME = "sessionsLog:updated"` + `emit()` + `subscribeSessionsLog(cb)` 双订阅（CustomEvent 同 tab + storage event 跨 tab）。修真 bug：recent-sessions 收不到 events
+- `tests/unit/core/ag-ui-error.test.ts`（84 行 4 个测试）+ `tests/unit/core/json-ui-apply-field.test.ts`（76 行 4 个测试）
+- `core/engine/json-ui/apply.ts` —— `locate()` 支持尾段 `props` / `data` / `id` / `type`（返回 `loc.field`），`patchNode` 处理 `loc.field === "props"` 时 value 整段当新 props 内容（`{ ...target.props, ...(value as Record<string, unknown>) }` 展开合并）
+- `core/protocols/ag-ui/mapper.ts` —— `AguiToolCallStart.name?` 兼容别名 + `AguiToolCallEnd.error?` + mapper 转发 `result` 和 `error` 到 emitted `ToolChunk`
+- `core/models/registry.ts` —— 13 BUILTIN_MODELS 加 2026 USD 价格（Ollama = $0）
+
+### 已知问题（v0.1.0-w5 收尾后）
+
+- `sessionsLog` 仍是 localStorage（5MB 限制，max=50 已够；W9 升级 IndexedDB 跨设备同步）
+- 真 deepseek 端到端 e2e 还没自动化（当前是手动跑 `/labs/streaming/markdown` 切 api 模式）
+- `.env.example` 写得够清楚，但 W7 接入真 LLM 时需要补一行 `QWEN_API_BASE`
+
+### 计数
+
+- `npm run verify` 全绿：biome ✓ + tsc ✓ + **128 vitest ✓** + next build ✓
+- 11 commits (§10.6 之后)
+- 1 个新 workflow (.github/workflows/verify.yml)
