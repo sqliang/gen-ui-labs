@@ -1,5 +1,5 @@
 "use client";
-import { Accessibility, Layers, Shield, Sparkles, Star } from "lucide-react";
+import { Accessibility, Download, Layers, Shield, Sparkles, Star } from "lucide-react";
 import { useState } from "react";
 
 import { LabContentPage, StatusPill } from "@/components/lab-content-page";
@@ -200,6 +200,36 @@ export default function ScorePage() {
     setResults(null);
   };
 
+  const handleExportCsv = () => {
+    if (!results) return;
+    const header = "model,provider,aesthetic,a11y,structure,stability,total,cost_usd,latency_ms\n";
+    const rows = results
+      .slice()
+      .sort((a, b) => b.total - a.total)
+      .map((r) =>
+        [
+          r.modelId,
+          r.provider,
+          r.scores.aesthetic,
+          r.scores.a11y,
+          r.scores.structure,
+          r.scores.stability,
+          r.total,
+          r.cost.toFixed(6),
+          r.durationMs,
+        ].join(","),
+      )
+      .join("\n");
+    const csv = header + rows;
+    const blob = new Blob([csv], { type: "text/csv" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `score-${Date.now()}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
   const handleToggleModel = (id: string) => {
     setSelectedModels((prev) => {
       const next = new Set(prev);
@@ -275,6 +305,17 @@ export default function ScorePage() {
                 {m.id}
               </button>
             ))}
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={handleExportCsv}
+              disabled={!results}
+              className="text-muted-foreground/85 hover:text-foreground/95 flex items-center gap-1.5 rounded border border-foreground/10 px-2 py-1 font-mono text-[10.5px] transition-colors disabled:opacity-40"
+            >
+              <Download className="size-3" />
+              export .csv
+            </button>
           </div>
         </div>
       }
