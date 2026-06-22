@@ -208,16 +208,43 @@ function JsonUiRendererCore({
     case "chart": {
       const chartType = String(p.type ?? "bar");
       const title = String(p.title ?? "Chart");
-      const labels = (p.labels as string[] | undefined) ?? [];
-      const values = ((p.values as number[] | undefined) ?? []).map((v) =>
-        Number.isFinite(v) ? Number(v) : 0,
-      );
-      const dataValues =
-        values.length > 0
-          ? values
-          : ((p.data as { values?: number[] } | undefined)?.values ?? []).map((v) =>
-              Number.isFinite(v) ? Number(v) : 0,
+      // data 接受两种格式：
+      // - 数组 [{label, value}, ...]
+      // - 对象 { labels: [...], values: [...] }
+      const rawData = p.data;
+      let chartLabels: string[] = [];
+      let chartValues: number[] = [];
+      if (Array.isArray(rawData)) {
+        for (const point of rawData) {
+          if (
+            point &&
+            typeof point === "object" &&
+            "value" in point &&
+            typeof (point as { value: unknown }).value === "number"
+          ) {
+            chartValues.push((point as { value: number }).value);
+            chartLabels.push(
+              typeof (point as { label?: unknown }).label === "string"
+                ? (point as { label: string }).label
+                : String(chartValues.length - 1),
             );
+          }
+        }
+      } else if (rawData && typeof rawData === "object") {
+        const obj = rawData as { labels?: unknown; values?: unknown };
+        if (Array.isArray(obj.labels)) chartLabels = obj.labels.map(String);
+        if (Array.isArray(obj.values)) {
+          chartValues = obj.values.map((v) => (Number.isFinite(v) ? Number(v) : 0));
+        }
+      }
+      // 老格式兼容：p.labels / p.values
+      if (chartLabels.length === 0 && Array.isArray(p.labels)) {
+        chartLabels = (p.labels as string[]).map(String);
+      }
+      if (chartValues.length === 0 && Array.isArray(p.values)) {
+        chartValues = (p.values as number[]).map((v) => (Number.isFinite(v) ? Number(v) : 0));
+      }
+      const dataValues = chartValues;
       const max = dataValues.length > 0 ? Math.max(...dataValues, 1) : 1;
       return wrap(
         <Card className="border-foreground/10 bg-card/40">
@@ -248,10 +275,10 @@ function JsonUiRendererCore({
                         height: `${Math.max(2, (v / max) * 100)}%`,
                         minHeight: "2px",
                       }}
-                      title={`${labels[i] ?? i}: ${v}`}
+                      title={`${chartLabels[i] ?? i}: ${v}`}
                     />
                     <span className="text-muted-foreground/70 w-full truncate text-center font-mono text-[9px]">
-                      {labels[i] ?? i}
+                      {chartLabels[i] ?? i}
                     </span>
                   </div>
                 ))}

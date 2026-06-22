@@ -13,7 +13,7 @@ function sseLine(patch: JsonUiPatch): string {
   return `data: ${JSON.stringify(patch)}\n\n`;
 }
 
-const MOCK_PATCHES: JsonUiPatch[] = [
+const MOCK_PATCHES_DEFAULT: JsonUiPatch[] = [
   {
     op: "mount",
     path: "/root",
@@ -128,11 +128,107 @@ const MOCK_PATCHES: JsonUiPatch[] = [
   },
 ];
 
-export async function POST(_request: Request): Promise<Response> {
+const MOCK_PATCHES_CHART: JsonUiPatch[] = [
+  {
+    op: "mount",
+    path: "/root",
+    value: { type: "card", props: { title: "GenUI Labs · 图表演示" } },
+  },
+  { op: "mount", path: "/root/children/0", value: { type: "chart", props: { type: "bar" } } },
+  {
+    op: "patch",
+    path: "/root/children/0/props",
+    value: {
+      type: "bar",
+      data: [
+        { label: "Mon", value: 42 },
+        { label: "Tue", value: 67 },
+        { label: "Wed", value: 88 },
+        { label: "Thu", value: 53 },
+        { label: "Fri", value: 91 },
+        { label: "Sat", value: 75 },
+        { label: "Sun", value: 60 },
+      ],
+      accent: "oklch(0.78 0.16 230)",
+    },
+  },
+  { op: "mount", path: "/root/children/1", value: { type: "chart", props: { type: "line" } } },
+  {
+    op: "patch",
+    path: "/root/children/1/props",
+    value: {
+      type: "line",
+      data: [
+        { label: "Jan", value: 12 },
+        { label: "Feb", value: 18 },
+        { label: "Mar", value: 25 },
+        { label: "Apr", value: 32 },
+        { label: "May", value: 45 },
+        { label: "Jun", value: 58 },
+      ],
+      accent: "oklch(0.78 0.16 145)",
+    },
+  },
+  {
+    op: "mount",
+    path: "/root/children/2",
+    value: {
+      type: "text",
+      props: { content: "上面两个 chart 用的是同一份 mock data 节点，加载 4 patches 就能渲染。" },
+    },
+  },
+];
+
+const MOCK_PATCHES_FORM: JsonUiPatch[] = [
+  {
+    op: "mount",
+    path: "/root",
+    value: { type: "card", props: { title: "登录" } },
+  },
+  {
+    op: "mount",
+    path: "/root/children/0",
+    value: {
+      type: "input",
+      props: { type: "email", label: "Email", placeholder: "you@example.com" },
+    },
+  },
+  {
+    op: "mount",
+    path: "/root/children/1",
+    value: { type: "input", props: { type: "password", label: "Password" } },
+  },
+  {
+    op: "mount",
+    path: "/root/children/2",
+    value: { type: "button", props: { label: "Sign in" } },
+  },
+  {
+    op: "mount",
+    path: "/root/children/3",
+    value: { type: "text", props: { content: "form scenario：5 patches 就能出登录表单。" } },
+  },
+];
+
+function pickScenario(scenario: unknown): JsonUiPatch[] {
+  if (scenario === "chart") return MOCK_PATCHES_CHART;
+  if (scenario === "form") return MOCK_PATCHES_FORM;
+  return MOCK_PATCHES_DEFAULT;
+}
+
+export async function POST(request: Request): Promise<Response> {
+  let scenario: unknown = "default";
+  try {
+    const body = (await request.json()) as { scenario?: unknown };
+    if (typeof body.scenario === "string") scenario = body.scenario;
+  } catch {
+    // no body or invalid JSON → default
+  }
+  const patches = pickScenario(scenario);
   const stream = new ReadableStream<Uint8Array>({
     start(controller) {
       const encoder = new TextEncoder();
-      for (const patch of MOCK_PATCHES) {
+      for (const patch of patches) {
         controller.enqueue(encoder.encode(sseLine(patch)));
       }
       controller.close();

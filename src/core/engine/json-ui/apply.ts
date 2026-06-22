@@ -31,6 +31,8 @@ type LocateResult = {
   idx: number;
   /** 是否是根节点本身 */
   isRoot: boolean;
+  /** 节点属性段：patchNode 用此改 parent.props.X */
+  field?: "props" | "data" | "id" | "type";
 };
 
 function locate(doc: JsonUiDocument, segments: string[]): LocateResult | null {
@@ -39,27 +41,36 @@ function locate(doc: JsonUiDocument, segments: string[]): LocateResult | null {
   if (segments.length === 1) {
     return { parent: null, idx: -1, isRoot: true };
   }
-  // 期望 segments 形如 ["root", "children", "0", "children", "1", ...]
-  // parent = doc.root 走 "children/{i}" 交替
+  // 期望 segments 形如 [root, children, idx, children, idx, ...]
+  // 可选尾段：props / data / id（节点属性）
   let cur: JsonUiNode = doc.root;
-  // segments 从 index 1 开始，期望是 "children"
-  for (let i = 1; i < segments.length; i += 2) {
+  let i = 1;
+  while (i < segments.length) {
     const kind = segments[i];
+    if (kind === "props" || kind === "data" || kind === "id" || kind === "type") {
+      // 节点属性段：返回当前节点的 parent 引用（让 patchNode 改其属性）
+      if (i === segments.length - 1) {
+        return { parent: cur, idx: -1, isRoot: false, field: kind };
+      }
+      return null;
+    }
+    if (kind !== "children") return null;
     const idxStr = segments[i + 1];
-    if (kind !== "children" || idxStr === undefined) return null;
+    if (idxStr === undefined) return null;
     const idx = Number.parseInt(idxStr, 10);
     if (Number.isNaN(idx) || idx < 0) return null;
-    // 终点：i + 2 === segments.length 表示下一段(idx)就是路径最后一段
-    if (i + 2 >= segments.length) {
+    // 节点 path 终点：i + 2 === segments.length
+    if (i + 2 === segments.length) {
       if (!cur.children) return null;
       if (idx >= cur.children.length) return null;
       return { parent: cur, idx, isRoot: false };
     }
-    // 中间段：cur = cur.children[idx]
+    // 中间段
     if (!cur.children || idx >= cur.children.length) return null;
     const next = cur.children[idx];
     if (!next) return null;
     cur = next;
+    i += 2;
   }
   return null;
 }
@@ -140,6 +151,19 @@ function patchNode(
   if (loc.isRoot) {
     // root: value 是 Partial<JsonUiNode>，只覆盖指定字段（深 merge props）
     return { root: mergeNodes(root, value) as JsonUiNode };
+  }
+  if (!loc.parent) return doc;
+  if (loc.field === "props") {
+    // path /root/children/0/props → value 整个当新 props 内容（替换）
+    loc.parent.props = { ...(loc.parent.props ?? {}), ...(value as Record<string, unknown>) };
+    return { root };
+  }
+  if (loc.field === "type" && typeof (value as { type?: unknown }).type === "string") {
+    loc.parent.type = (value as { type: string }).type as typeof loc.parent.type;
+    return { root };
+  }
+  if (loc.field) {
+    return doc; // 暂不实现 data/id 字段 patch
   }
   if (!loc.parent?.children) return doc;
   const target = loc.parent.children[loc.idx];
