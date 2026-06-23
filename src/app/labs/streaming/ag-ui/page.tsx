@@ -478,6 +478,8 @@ export default function AguiPage() {
   // 事件时间戳（相对首个事件的 ms）
   const startTimeRef = useRef<number | null>(null);
   const [now, setNow] = useState(0);
+  const [providerMode, setProviderMode] = useState<"mock" | "deepseek">("mock");
+  const [prompt, setPrompt] = useState("一句话介绍 deepseek");
 
   // 跑起来后每秒刷新右下时间
   useEffect(() => {
@@ -607,7 +609,20 @@ export default function AguiPage() {
     setNow(0);
 
     try {
-      for await (const evt of fetchSse("/api/ag-ui", { body: {} })) {
+      // URL ?provider=deepseek&prompt=xxx 覆盖默认 mock
+      const urlProvider =
+        typeof window !== "undefined"
+          ? new URLSearchParams(window.location.search).get("provider")
+          : null;
+      const urlPrompt =
+        typeof window !== "undefined"
+          ? new URLSearchParams(window.location.search).get("prompt")
+          : null;
+      const effectiveProvider = urlProvider === "deepseek" ? "deepseek" : providerMode;
+      const effectivePrompt = urlPrompt ?? prompt;
+      for await (const evt of fetchSse("/api/ag-ui", {
+        body: { provider: effectiveProvider, prompt: effectivePrompt },
+      })) {
         let agui: AguiEvent;
         try {
           agui = JSON.parse(evt.data) as AguiEvent;
