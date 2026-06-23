@@ -35,7 +35,8 @@ export default function WorkbenchThreePanePage() {
   const [selectedNodePath, setSelectedNodePath] = useState<string | null>(null);
   const [isStreaming, setIsStreaming] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
-  const [scenario, setScenario] = useState<"default" | "chart" | "form">("default");
+  const [scenario, setScenario] = useState<"default" | "chart" | "form" | "deepseek">("default");
+  const [prompt, setPrompt] = useState("做一个包含 4 个 KPI 卡片 + 1 个图表的 dashboard");
   const abortRef = useRef<AbortController | null>(null);
 
   const handleStart = useCallback(async () => {
@@ -51,7 +52,7 @@ export default function WorkbenchThreePanePage() {
     let accumulated: JsonUiPatch[] = [];
     try {
       for await (const evt of fetchSse("/api/json-ui", {
-        body: { scenario },
+        body: scenario === "deepseek" ? { provider: "deepseek", prompt } : { scenario },
         signal: ac.signal,
       })) {
         let patch: JsonUiPatch;
@@ -73,7 +74,7 @@ export default function WorkbenchThreePanePage() {
     } finally {
       setIsStreaming(false);
     }
-  }, [scenario]);
+  }, [scenario, prompt]);
 
   // 节点统计
   const stats = useMemo(() => {
@@ -144,11 +145,23 @@ export default function WorkbenchThreePanePage() {
                 { label: "default", value: "default" },
                 { label: "chart", value: "chart" },
                 { label: "form", value: "form" },
+                { label: "deepseek", value: "deepseek" },
               ]}
               value={scenario}
               onChange={setScenario}
             />
           </Field>
+          {scenario === "deepseek" && (
+            <Field label="deepseek prompt">
+              <input
+                type="text"
+                value={prompt}
+                onChange={(e) => setPrompt(e.target.value)}
+                placeholder="描述你想生成的 JSON-UI 结构"
+                className="border-foreground/15 bg-foreground/[0.02] placeholder:text-muted-foreground/40 focus-visible:border-foreground/30 w-full rounded border px-2 py-1 font-mono text-[11px] focus-visible:outline-none"
+              />
+            </Field>
+          )}
           <Field label="快捷键" hint="⌘/Ctrl+Enter 触发">
             <span className="text-muted-foreground/70 font-mono text-[11px]">
               开始 / 停止 / 重置
