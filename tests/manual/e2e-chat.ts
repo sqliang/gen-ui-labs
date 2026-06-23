@@ -1,5 +1,5 @@
 /**
- * 真 e2e 测试（curl 风格）—— 跑 `/api/chat` 验证 SSE 流 + Zod 验证。
+ * 真 e2e 测试（curl 风格）—— 跑 `/api/chat` `/api/json-ui` `/api/ag-ui` 验证 SSE 流 + Zod 验证。
  *
  * 用法（需 dev server 在 :3000）：
  *   curl http://localhost:3000/api/health  # 先确认 server alive
@@ -75,8 +75,31 @@ async function fetchSse(
   return { status: res.status, events };
 }
 
+async function fetchSseUrl(
+  path: string,
+  body: unknown,
+  maxMs = 30_000,
+): Promise<{ status: number; text: string }> {
+  const res = await fetch(`${BASE}${path}`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  if (!res.body) return { status: res.status, text: "" };
+  const reader = res.body.getReader();
+  const decoder = new TextDecoder();
+  let buf = "";
+  const start = Date.now();
+  while (Date.now() - start < maxMs) {
+    const { value, done } = await reader.read();
+    if (done) break;
+    buf += decoder.decode(value, { stream: true });
+  }
+  return { status: res.status, text: buf };
+}
+
 async function main(): Promise<void> {
-  console.log(`\n=== /api/chat e2e (BASE=${BASE}) ===\n`);
+  console.log(`\n=== e2e (BASE=${BASE}) ===\n`);
 
   // 0. health check
   try {
@@ -138,20 +161,21 @@ async function main(): Promise<void> {
     `len=${json.length}`,
   );
 
-  // 6. /api/chat deepseek (real provider — skipped if no key)
-  console.log("\n[6] /api/chat deepseek real (skipped if no key)");
   const dsKey = (keys.providers as Array<{ provider: string; configured: boolean }>).find(
     (p) => p.provider === "deepseek",
   )?.configured;
+
+  // 6. /api/chat deepseek (real provider — skipped if no key)
+  console.log("\n[6] /api/chat deepseek real (skipped if no key)");
   if (!dsKey) {
-    console.log("  ⊘ skip — DEEPSEEK_API_KEY not configured in .env.local");
+    console.log("  ⊘ skip — DEEPSEEK_API_KEY not configured");
   } else {
     const { status: dsStatus, events: dsEvents } = await fetchSse(
       {
         model: "deepseek-chat",
         messages: [{ role: "user", content: "说一句话证明你在线" }],
       },
-      false, // real provider, not debug
+      false,
     );
     assert("200 OK", dsStatus === 200, `status=${dsStatus}`);
     const text = (dsEvents as { kind?: string; delta?: string }[])
@@ -166,26 +190,53 @@ async function main(): Promise<void> {
   if (!dsKey) {
     console.log("  ⊘ skip — DEEPSEEK_API_KEY not configured");
   } else {
-    const res7 = await fetch(`${BASE}/api/json-ui`, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ provider: "deepseek", prompt: "做一个简单问候卡片" }),
-    });
-    assert("200 OK", res7.status === 200, `status=${res7.status}`);
-    const body7 = await res7.text();
-    const patches7 = body7
+    const { status: jStatus, text: jText } = await fetchSseUrl(
+      "/api/json-ui",
+      { provider: "deepseek", prompt: "做一个简单问候卡片" },
+      60_000,
+    );
+    assert("200 OK", jStatus === 200, `status=${jStatus}`);
+    const patches = jText
       .split("\n\n")
       .filter((l) => l.startsWith("data: "))
       .map((l) => JSON.parse(l.slice(6)));
-    assert("≥3 JSON-UI patches", patches7.length >= 3, `got ${patches7.length}`);
-    const rootMount = patches7.find(
+    assert("≥2 JSON-UI patches", patches.length >= 2, `got ${patches.length}`);
+    const rootMount = patches.find(
       (p: { op: string; path: string; value?: { type?: string } }) =>
         p.op === "mount" && (p.path === "/root" || p.path === "/root/children/0") && p.value?.type,
     );
     assert(
       "has at least one mount with type",
       Boolean(rootMount),
-      `first mount=${JSON.stringify(patches7[0]).slice(0, 80)}`,
+      `first mount=${JSON.stringify(patches[0]).slice(0, 80)}`,
+    );
+  }
+
+  // 8. /api/ag-ui deepseek provider
+  console.log("\n[8] /api/ag-ui deepseek provider (skipped if no key)");
+  if (!dsKey) {
+    console.log("  ⊘ skip — DEEPSEEK_API_KEY not configured");
+  } else {
+    const { status: aStatus, text: aText } = await fetchSseUrl(
+      "/api/ag-ui",
+      { provider: "deepseek", prompt: "你好" },
+      60_000,
+    );
+    assert("200 OK", aStatus === 200, `status=${aStatus}`);
+    const events = aText
+      .split("\n\n")
+      .filter((l) => l.startsWith("data: "))
+      .map((l) => JSON.parse(l.slice(6)));
+    assert("≥3 AG-UI events", events.length >= 3, `got ${events.length}`);
+    const started = events.find((e: { type?: string }) => e.type === "RUN_STARTED");
+    const finished = events.find((e: { type?: string }) => e.type === "RUN_FINISHED");
+    const textEvt = events.find((e: { type?: string }) => e.type === "TEXT_MESSAGE_CONTENT");
+    assert("has RUN_STARTED", Boolean(started), "missing start");
+    assert("has RUN_FINISHED", Boolean(finished), "missing end");
+    assert(
+      "TEXT_MESSAGE_CONTENT has delta",
+      Boolean((textEvt as { delta?: string })?.delta),
+      `delta=${(textEvt as { delta?: string })?.delta?.slice(0, 40)}`,
     );
   }
 

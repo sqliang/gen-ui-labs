@@ -1,5 +1,5 @@
 /**
- * /api/ag-ui 路由（W4-3 mock + W4 末动态）。
+ * /api/ag-ui 路由（W4-3 mock + W4 末动态 + W6 末 deepseek 真接）。
  *
  * 返回 AG-UI 协议的 SSE 事件流（NDJSON 格式，一行一个事件）。
  *
@@ -8,18 +8,17 @@
  * → TEXT_MESSAGE_CONTENT（后续文本）→ RUN_FINISHED
  *
  * W4 末：?prompt=xxx 让 mock 看起来"对 prompt 有反应"。
- * - 包含 "search" / "查询" / "找"：返回带 web_search tool call 的事件流
- * - 包含 "write" / "写" / "create"：返回带 file_create tool call
- * - 包含 "json" / "ui"：返回带 surface_render tool call
- * - 其它：纯文本事件流
- *
- * 真实使用 AG-UI 事件流的 LLM（agent framework）通过这个 SSE 接 stub provider。
+ * W6 末：provider="deepseek" 真调 deepseek 输出 TEXT_MESSAGE_CONTENT。
  */
 
+import { getModelProvider } from "@/core/models";
 import type { AguiEvent } from "@/core/protocols/ag-ui/mapper";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
+
+const DEEPSEEK_AGUI_SYSTEM_PROMPT = `You are an AG-UI agent. Output ONLY plain text reply (no JSON, no markdown fences).
+The text will be wrapped in a TEXT_MESSAGE_CONTENT event by the server.`;
 
 function sseLine(event: AguiEvent): string {
   return `data: ${JSON.stringify(event)}\n\n`;
@@ -128,16 +127,26 @@ const TICK_MS = 180;
 export async function POST(request: Request): Promise<Response> {
   // 读 body 取 prompt
   let prompt = "default";
+  let provider = "mock";
   try {
     const text = await request.text();
     if (text) {
-      const body = JSON.parse(text) as { prompt?: string };
+      const body = JSON.parse(text) as {
+        prompt?: string;
+        provider?: string;
+      };
       if (typeof body.prompt === "string" && body.prompt.trim()) {
         prompt = body.prompt.trim();
       }
+      if (typeof body.provider === "string") provider = body.provider;
     }
   } catch {
     // 忽略
+  }
+
+  // 真 deepseek 路径
+  if (provider === "deepseek" && process.env.DEEPSEEK_API_KEY) {
+    return deepseekStream(request, prompt);
   }
 
   const events = buildEventsForPrompt(prompt);
@@ -150,6 +159,85 @@ export async function POST(request: Request): Promise<Response> {
         await new Promise<void>((resolve) => setTimeout(resolve, TICK_MS));
       }
       controller.close();
+    },
+  });
+
+  return new Response(stream, {
+    status: 200,
+    headers: {
+      "content-type": "text/event-stream",
+      "cache-control": "no-cache, no-transform",
+      connection: "keep-alive",
+    },
+  });
+}
+
+function deepseekStream(request: Request, prompt: string): Response {
+  const encoder = new TextEncoder();
+  const runId = `run_${Date.now().toString(36)}`;
+  const threadId = "thread_deepseek";
+  const messageId = "msg_deepseek";
+  const stream = new ReadableStream<Uint8Array>({
+    async start(controller) {
+      try {
+        const provider = getModelProvider("deepseek-chat");
+        if (!provider) {
+          controller.enqueue(
+            encoder.encode(
+              sseLine({
+                type: "TEXT_MESSAGE_CONTENT",
+                messageId,
+                delta: "deepseek provider not found",
+              }),
+            ),
+          );
+          controller.close();
+          return;
+        }
+
+        controller.enqueue(encoder.encode(sseLine({ type: "RUN_STARTED", threadId, runId })));
+
+        let accumulated = "";
+        for await (const chunk of provider.stream(
+          {
+            model: "deepseek-chat",
+            messages: [
+              { role: "system", content: DEEPSEEK_AGUI_SYSTEM_PROMPT },
+              { role: "user", content: prompt },
+            ],
+          },
+          request.signal,
+        )) {
+          if (chunk.kind === "text") {
+            accumulated += chunk.delta;
+          }
+        }
+
+        controller.enqueue(
+          encoder.encode(
+            sseLine({
+              type: "TEXT_MESSAGE_CONTENT",
+              messageId,
+              delta: accumulated,
+            }),
+          ),
+        );
+
+        controller.enqueue(encoder.encode(sseLine({ type: "RUN_FINISHED", threadId, runId })));
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        controller.enqueue(
+          encoder.encode(
+            sseLine({
+              type: "TEXT_MESSAGE_CONTENT",
+              messageId,
+              delta: `deepseek error: ${msg}`,
+            }),
+          ),
+        );
+      } finally {
+        controller.close();
+      }
     },
   });
 
