@@ -1,20 +1,35 @@
 /**
- * /api/a2ui 路由（W5 mock + W4 末动态）。
+ * /api/a2ui 路由（W5 mock + W4 末动态 + W6 末 deepseek 真接）。
  *
  * 返回 A2UI v0.2 协议的 SSE 事件流。
  * 模拟一个完整的 surface 生命周期：beginRendering → surfaceUpdate → dataModelUpdate → dismissSurface
  *
  * W4 末：?prompt=xxx 让 mock 看起来"对 prompt 有反应"。
- * - 包含 "table" / "表"：返回带 table 组件的 surface
- * - 包含 "chart" / "图"：返回带 chart 组件的 surface
- * - 包含 "form" / "表单"：返回带 form 组件的 surface
- * - 其它：默认 card + text + flex 组合
+ * W6 末：provider="deepseek" 真调 deepseek 输出 A2UI component JSON 数组，
+ * server 包装成 surfaceUpdate + beginRendering。
  */
 
-import type { A2uiEvent } from "@/core/protocols/a2ui/mapper";
+import { getModelProvider } from "@/core/models";
+import type { A2uiComponentNode, A2uiEvent } from "@/core/protocols/a2ui/mapper";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
+
+const DEEPSEEK_A2UI_SYSTEM_PROMPT = `You are an A2UI surface generator. Output ONLY a valid JSON object:
+
+{
+  "components": [
+    {"id":"root","component":"Column","children":["title","desc"]},
+    {"id":"title","component":"Text","text":"Hello!"},
+    {"id":"desc","component":"Text","text":"Brief description."}
+  ]
+}
+
+Available components: Column, Row, Text, Card, Button, TextField, Checkbox.
+Rules:
+1. First component must be id="root" with component="Column" or "Card"
+2. 3-8 components total
+3. Output ONLY the JSON, no markdown fences, no preamble.`;
 
 function sseLine(event: A2uiEvent): string {
   return `data: ${JSON.stringify(event)}\n\n`;
@@ -178,16 +193,25 @@ const TICK_MS = 200;
 
 export async function POST(request: Request): Promise<Response> {
   let prompt = "default";
+  let provider = "mock";
   try {
     const text = await request.text();
     if (text) {
-      const body = JSON.parse(text) as { prompt?: string };
+      const body = JSON.parse(text) as {
+        prompt?: string;
+        provider?: string;
+      };
       if (typeof body.prompt === "string" && body.prompt.trim()) {
         prompt = body.prompt.trim();
       }
+      if (typeof body.provider === "string") provider = body.provider;
     }
   } catch {
     // ignore
+  }
+
+  if (provider === "deepseek" && process.env.DEEPSEEK_API_KEY) {
+    return deepseekStream(request, prompt);
   }
 
   const events = buildEventsForPrompt(prompt);
@@ -200,6 +224,113 @@ export async function POST(request: Request): Promise<Response> {
         await new Promise<void>((resolve) => setTimeout(resolve, TICK_MS));
       }
       controller.close();
+    },
+  });
+
+  return new Response(stream, {
+    status: 200,
+    headers: {
+      "content-type": "text/event-stream",
+      "cache-control": "no-cache, no-transform",
+      connection: "keep-alive",
+    },
+  });
+}
+
+function deepseekStream(request: Request, prompt: string): Response {
+  const encoder = new TextEncoder();
+  const surfaceId = "main";
+  const stream = new ReadableStream<Uint8Array>({
+    async start(controller) {
+      try {
+        const provider = getModelProvider("deepseek-chat");
+        if (!provider) {
+          controller.enqueue(
+            encoder.encode(
+              sseLine({
+                type: "dismissSurface",
+                surfaceId,
+              }),
+            ),
+          );
+          controller.close();
+          return;
+        }
+
+        let accumulated = "";
+        for await (const chunk of provider.stream(
+          {
+            model: "deepseek-chat",
+            messages: [
+              { role: "system", content: DEEPSEEK_A2UI_SYSTEM_PROMPT },
+              { role: "user", content: prompt },
+            ],
+          },
+          request.signal,
+        )) {
+          if (chunk.kind === "text") {
+            accumulated += chunk.delta;
+          }
+        }
+
+        // 解析 deepseek 输出 —— 找 {…}
+        const objStart = accumulated.indexOf("{");
+        const objEnd = accumulated.lastIndexOf("}");
+        if (objStart === -1 || objEnd === -1) {
+          controller.enqueue(
+            encoder.encode(
+              sseLine({
+                type: "dismissSurface",
+                surfaceId,
+              }),
+            ),
+          );
+          controller.close();
+          return;
+        }
+        const json = accumulated.slice(objStart, objEnd + 1);
+        const parsed = JSON.parse(json) as {
+          components?: Record<string, unknown>[];
+        };
+
+        controller.enqueue(
+          encoder.encode(
+            sseLine({
+              type: "surfaceUpdate",
+              surfaceId,
+              contents: (parsed.components ?? []) as unknown as A2uiComponentNode[],
+            }),
+          ),
+        );
+        controller.enqueue(
+          encoder.encode(
+            sseLine({
+              type: "beginRendering",
+              surfaceId,
+              root: "root",
+            }),
+          ),
+        );
+        controller.enqueue(
+          encoder.encode(
+            sseLine({
+              type: "dismissSurface",
+              surfaceId,
+            }),
+          ),
+        );
+      } catch {
+        controller.enqueue(
+          encoder.encode(
+            sseLine({
+              type: "dismissSurface",
+              surfaceId,
+            }),
+          ),
+        );
+      } finally {
+        controller.close();
+      }
     },
   });
 

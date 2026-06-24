@@ -240,6 +240,32 @@ async function main(): Promise<void> {
     );
   }
 
+  // 9. /api/a2ui deepseek provider
+  console.log("\n[9] /api/a2ui deepseek provider (skipped if no key)");
+  if (!dsKey) {
+    console.log("  ⊘ skip — DEEPSEEK_API_KEY not configured");
+  } else {
+    const { status: aStatus, text: aText } = await fetchSseUrl(
+      "/api/a2ui",
+      { provider: "deepseek", prompt: "做一个问候卡片" },
+      60_000,
+    );
+    assert("200 OK", aStatus === 200, `status=${aStatus}`);
+    const events = aText
+      .split("\n\n")
+      .filter((l) => l.startsWith("data: "))
+      .map((l) => JSON.parse(l.slice(6)));
+    assert("≥3 A2UI events", events.length >= 3, `got ${events.length}`);
+    const surfaceUpdate = events.find(
+      (e: { type?: string }) => e.type === "surfaceUpdate",
+    );
+    assert("has surfaceUpdate", Boolean(surfaceUpdate), "missing surfaceUpdate");
+    const beginRender = events.find(
+      (e: { type?: string }) => e.type === "beginRendering",
+    );
+    assert("has beginRendering", Boolean(beginRender), "missing beginRendering");
+  }
+
   // summary
   const passed = results.filter((r) => r.pass).length;
   const failed = results.length - passed;

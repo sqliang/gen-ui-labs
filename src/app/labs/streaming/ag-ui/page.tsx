@@ -478,8 +478,6 @@ export default function AguiPage() {
   // 事件时间戳（相对首个事件的 ms）
   const startTimeRef = useRef<number | null>(null);
   const [now, setNow] = useState(0);
-  const [providerMode, setProviderMode] = useState<"mock" | "deepseek">("mock");
-  const [prompt, setPrompt] = useState("一句话介绍 deepseek");
 
   // 跑起来后每秒刷新右下时间
   useEffect(() => {
