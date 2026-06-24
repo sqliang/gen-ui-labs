@@ -1116,3 +1116,71 @@ done
 - `npm run verify` 全绿：biome ✓ + tsc ✓ + **134 vitest ✓** + next build ✓
 - **2 commits** (§10.8 之后)
 - **0 新依赖**（§3 严格遵守）
+
+## 10.10 W6+ 全面 LLM 接入（2026-06-22 · v0.1.0-w5+4）
+
+> §10.9 之后的所有 LLM 真接工作。
+
+### 已交付
+
+**`/api/ag-ui` 真接 deepseek**
+
+- `src/app/api/ag-ui/route.ts`：POST 加 `provider="deepseek"` flag
+  - 真调 `getModelProvider("deepseek-chat").stream(...)`
+  - Server wrap 深 deepseek text output 为 AG-UI event 流：
+    `RUN_STARTED → TEXT_MESSAGE_CONTENT (full text) → RUN_FINISHED`
+  - 浏览器实测：deepseek 输出 "DeepSeek的优势在于它强大的推理能力..." 渲染 3 events
+
+**`/labs/streaming/ag-ui` URL flag override**
+
+- 读 `?provider=deepseek&prompt=xxx` 覆盖默认 mock
+- 默认 prompt: "一句话介绍 deepseek 的优势"
+- 避免 sibling auto-format 改坏 toolbar UI 风险 → URL flag 更简洁
+
+**`/api/a2ui` 真接 deepseek**
+
+- `src/app/api/a2ui/route.ts`：POST 加 `provider="deepseek"` flag
+  - System prompt 让 deepseek 输出 `{components: [...]}` JSON 对象
+  - Server 找 `{objStart..objEnd}` → `JSON.parse` → cast A2uiComponentNode[]
+  - 包装成 A2UI 流：`surfaceUpdate (contents) → beginRendering → dismissSurface`
+  - 实测：deepseek 输出 4 components (root=Card + name=Text + greeting=Text + message=Text)
+
+**`/labs/streaming/a2ui` URL flag override**
+
+- 读 `?provider=deepseek&prompt=xxx`
+- 默认 prompt: "做一个问候卡片"
+- 浏览器实测：deepseek 输出 Card + 2 Text（项目名称 / 这是项目的简要描述。）
+
+**Cleanup**
+
+- `src/app/labs/streaming/ag-ui/page.tsx` 移除 unused `setProviderMode/setPrompt` state（之前 toolbar revert 残留）
+
+### 端到端验证
+
+| 端点 | 状态 | E2E 测试 |
+|---|---|---|
+| `/api/chat` | ✓ 真接 deepseek (markdown page) | section [6] |
+| `/api/json-ui` | ✓ 真接 deepseek | section [7] |
+| `/api/ag-ui` | ✓ 真接 deepseek | section [8] |
+| `/api/a2ui` | ✓ 真接 deepseek | section [9] |
+
+E2E: **25/25 pass** (从 11 起步，+14 全 deepseek 真接相关)
+
+| UI 页面 | deepseek 触发方式 |
+|---|---|
+| `/labs/streaming/markdown` | 切到 api mode → 点开始 |
+| `/labs/streaming/ag-ui` | URL `?provider=deepseek&prompt=xxx` |
+| `/labs/streaming/a2ui` | URL `?provider=deepseek&prompt=xxx` |
+| `/labs/codegen/json-ui` | toolbar mock/deepseek toggle |
+| `/labs/workbench/three-pane` | scenario chip 选 deepseek |
+
+### 已知问题
+
+- 4 个 streaming page (markdown/ag-ui/a2ui) URL flag UI 没暴露 —— 依赖 URL searchParams（也符合 §9 状态管理原则）
+- 某些 deepseek prompt 会触发不同输出格式，需要 robust JSON parse
+
+### 计数
+
+- `npm run verify` 全绿：biome ✓ + tsc ✓ + **134 vitest ✓** + next build ✓
+- **4 commits** (§10.9 之后)
+- **0 新依赖**（§3 严格遵守）
