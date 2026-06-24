@@ -52,7 +52,21 @@ export default function A2uiPage() {
     adapterRef.current.reset();
 
     try {
-      for await (const evt of fetchSse("/api/a2ui", { body: {} })) {
+      // URL ?provider=deepseek&prompt=xxx 覆盖默认 mock
+      const urlProvider =
+        typeof window !== "undefined"
+          ? new URLSearchParams(window.location.search).get("provider")
+          : null;
+      const urlPrompt =
+        typeof window !== "undefined"
+          ? new URLSearchParams(window.location.search).get("prompt")
+          : null;
+      for await (const evt of fetchSse("/api/a2ui", {
+        body: {
+          provider: urlProvider === "deepseek" ? "deepseek" : "mock",
+          prompt: urlPrompt ?? "做一个问候卡片",
+        },
+      })) {
         let a2ui: A2uiEvent;
         try {
           a2ui = JSON.parse(evt.data) as A2uiEvent;

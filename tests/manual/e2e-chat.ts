@@ -256,13 +256,9 @@ async function main(): Promise<void> {
       .filter((l) => l.startsWith("data: "))
       .map((l) => JSON.parse(l.slice(6)));
     assert("≥3 A2UI events", events.length >= 3, `got ${events.length}`);
-    const surfaceUpdate = events.find(
-      (e: { type?: string }) => e.type === "surfaceUpdate",
-    );
+    const surfaceUpdate = events.find((e: { type?: string }) => e.type === "surfaceUpdate");
     assert("has surfaceUpdate", Boolean(surfaceUpdate), "missing surfaceUpdate");
-    const beginRender = events.find(
-      (e: { type?: string }) => e.type === "beginRendering",
-    );
+    const beginRender = events.find((e: { type?: string }) => e.type === "beginRendering");
     assert("has beginRendering", Boolean(beginRender), "missing beginRendering");
   }
 
