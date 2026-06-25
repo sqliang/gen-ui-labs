@@ -25,6 +25,29 @@ pnpm dev                          # localhost:3000
 
 > `DEEPSEEK_API_KEY` 是唯一 **必填** 的 key（其它 provider 也能加，但只有 deepseek 走真流式）。
 
+## 🧠 真接 LLM 端点（W6+）
+
+所有 4 个核心协议端点都已真接 deepseek（无 key 时自动 fallback mock）：
+
+| 端点 | protocol | 真接 deepseek | URL flag 触发 |
+|---|---|---|---|
+| `/api/chat` | openai-compatible | ✓ markdown 模式 | — |
+| `/api/json-ui` | JSON-UI DSL | ✓ output patches | `?provider=deepseek&prompt=xxx` |
+| `/api/ag-ui` | AG-UI v0.2 | ✓ typed events | `?provider=deepseek&prompt=xxx` |
+| `/api/a2ui` | A2UI v0.2 | ✓ components | `?provider=deepseek&prompt=xxx` |
+
+5 个 UI 页面已暴露 deepseek 切换：
+
+| Page | 触发方式 |
+|---|---|
+| `/labs/streaming/markdown` | api/mock mode 切换 |
+| `/labs/streaming/ag-ui` | URL `?provider=deepseek` |
+| `/labs/streaming/a2ui` | URL `?provider=deepseek` |
+| `/labs/codegen/json-ui` | toolbar mock/deepseek toggle |
+| `/labs/workbench/three-pane` | scenario chip 选 deepseek |
+
+E2E 自动化：`pnpm tsx tests/manual/e2e-chat.ts`（25 assertions across 9 sections）。
+
 ## ⌘K 全局快捷键
 
 - **⌘K / Ctrl+K** → 命令面板（跳 Lab / 跳子页 / 跳 404 demo / github）
