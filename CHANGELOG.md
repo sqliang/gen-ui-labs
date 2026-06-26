@@ -90,6 +90,54 @@ W6+ 候选：
 - /api/ag-ui 仍是写死 mock（虽然 aguiAdapter 真在用，路径是"events → adapter → store → 渲染"）
 - ⌘K 快捷键在 input 内被吞（预期行为，文本框里不该触发全局快捷键）
 
+## v0.1.0-w5+ · 2026-06-22（§10.6-10.10 综合：W5 收尾 + LLM 真接）
+
+### 已交付
+
+**W5 协议深化 + Lab 3/4 真功能**
+- AG-UI stateful adapter（合并 tool call START/ARGS/END + STATE_DELTA 累积）
+- A2UI stateful adapter（多 surface 树 + 增量 mount/patch + snapshot 深拷贝）
+- 8 个新子页（workbench × 4 + observability × 4）+ 8 个 PlannedSubPage
+- 8 子页导出：score(.csv 9 列) / tools(trace.json) / tokens(.csv 7 列) / heatmap(.md) / inspector(.json) / reasoning(.md) / replay(.json)
+
+**SEO 基础设施**
+- rich metadata（title template / keywords / OpenGraph / Twitter card）
+- per-Lab-hub metadata (4) + per-sub-page metadata (16 sibling layout.tsx)
+- sitemap.ts（从 core/labs.ts 派生）+ robots.ts
+- opengraph-image.tsx（首页 1200×630 PNG）+ twitter-image.tsx + icon.tsx (32×32 favicon)
+
+**CI / 测试 / 文档**
+- GitHub Actions verify workflow（push to main + PR）
+- 真 deepseek e2e 自动化：tests/manual/e2e-chat.ts (25 assertions / 9 sections)
+- PROPOSAL §10.6-10.10 + CHANGELOG + README 全部同步
+- **134 vitest tests** + **25 e2e assertions** 全绿
+
+**深度 / 编排 / 文档**
+- IndexedDB sessions-log opt-in 升级（+ localStorage fallback + 6 unit tests）
+- A2UI 多 surface 编排 UI（add / delete / clear all 按钮）
+- ⌘K 加 5 个全局 actions（go-home / go-about / go-settings / scroll-top / scroll-bottom）
+- heatmap PathWrap severity outline 修复（真 bug 修）
+
+**LLM 真接（4 endpoint + 5 page）**
+- `/api/json-ui` POST 加 `provider="deepseek"` → 真调 deepseek 输出 JSON-UI patch 数组 → SSE 流
+- `/api/ag-ui` POST 加 `provider="deepseek"` → 真调 deepseek → 包装为 RUN_STARTED / TEXT_MESSAGE_CONTENT / RUN_FINISHED
+- `/api/a2ui` POST 加 `provider="deepseek"` → 真调 deepseek → 包装为 surfaceUpdate / beginRendering / dismissSurface
+- `/labs/streaming/ag-ui` + `/labs/streaming/a2ui` URL flag `?provider=deepseek&prompt=xxx`
+- `/labs/codegen/json-ui` toolbar mock/deepseek toggle + prompt input
+- `/labs/workbench/three-pane` scenario chip 加 deepseek + conditional prompt input
+
+### 已知问题（W6+ 候选）
+
+- 部分 deepseek prompt 会触发不同输出格式，需要 robust JSON parse（fallback 已加）
+- 4 个 streaming page URL flag UI 没暴露（依赖 URL searchParams）
+- 真 Playwright 浏览器 e2e（§3 不引 dep）
+
+### 计数
+
+- `npm run verify` 全绿：biome ✓ + tsc ✓ + **134 vitest ✓** + next build ✓
+- **24+ commits**（§10.6 之后）
+- **0 新依赖**（§3 严格遵守）
+
 ## v0.1.0-w3 · 2026-06-12
 
 - Markdown 流式协议端到端跑通（react-markdown + 暗色 prose）
